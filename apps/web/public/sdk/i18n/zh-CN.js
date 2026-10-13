@@ -1,0 +1,163 @@
+export default {
+  tools: {
+    fullscreen: {
+      enter: '全屏',
+      exit: '退出全屏',
+      tooltip: '全屏',
+    },
+    triggerAlarm: {
+      enable: '触发报警',
+      disable: '关闭报警',
+      error: '触发报警失败:',
+      tooltip: '报警',
+      modal: {
+        title: '手动报警',
+        description: '请选择报警类型后触发报警。报警会在30秒后自动关闭。',
+        placeholder: '请选择报警类型',
+        confirm: '确认',
+        cancel: '取消',
+        alarmType: {
+          light: '光报警',
+          lightSound: '声光报警',
+        },
+      },
+    },
+    volume: {
+      mute: '静音',
+      unmute: '取消静音',
+      tooltip: '音量',
+    },
+    lighting: {
+      enable: '打开灯光',
+      disable: '关闭灯光',
+      error: '切换灯光失败:',
+      tooltip: '灯光',
+    },
+    resolution: {
+      title: '画面质量切换',
+      tooltip: '分辨率',
+      modal: {
+        title: '画面质量切换',
+        placeholder: '分辨率选择功能待实现',
+      },
+      options: {
+        auto: '自动',
+        low: '低',
+        medium: '中',
+        high: '高',
+        max: 'MAX',
+      },
+    },
+    screenshot: {
+      title: '截图',
+      error: '截图失败:',
+      tooltip: '截图',
+    },
+    preset: {
+      title: '预设位',
+      tooltip: '预设',
+      modal: {
+        title: '预设位管理',
+        placeholder: '预设位管理功能待实现',
+      },
+    },
+    videoSetting: {
+      title: '画面设置',
+      tooltip: '设置',
+      modal: {
+        placeholder: '画面设置功能待实现',
+      },
+      hdr: {
+        title: 'HDR',
+        off: '关闭',
+        on: '开启',
+        disabledTip: '夜视模式关闭时，HDR不可用',
+      },
+      nightVision: {
+        title: '夜视模式',
+        off: '关闭',
+        infraredAuto: '黑白自动夜视',
+        spotlightAuto: '彩色自动夜视',
+        infraredAlwaysOn: '常开夜视（红外）',
+        spotlightAlwaysOn: '强制彩色夜视',
+      },
+      imageSetting: {
+        title: '影像设置',
+        reset: '重置',
+        brightness: '亮度',
+        chrome: '色度',
+        saturation: '饱和度',
+        contrast: '对比度',
+        sharpness: '锐度',
+      },
+      frequency: {
+        title: '频率设置',
+        auto: '自动',
+        hz50: '50Hz',
+        hz60: '60Hz',
+      },
+      rotate: {
+        title: '方向',
+        mirror: '镜像视图',
+        flip: '图像旋转',
+      },
+    },
+    layoutMode: {
+      title: '切换模式',
+      tooltip: '模式',
+    },
+    talkback: {
+      title: '语音对讲',
+      start: '开始对讲',
+      stop: '停止对讲',
+      ready: '对讲就绪',
+      initialzing: '对讲初始化中...',
+      starting: '开始对讲...',
+      active: '正在对讲',
+      stopping: '停止对讲中...',
+      error: '对讲错误',
+      destroyed: '对讲已销毁',
+      unknown: '未知状态',
+      retry: '重试',
+      preloadError: '对讲功能加载失败',
+      runtimeError: '对讲运行时错误',
+      description: '点击按钮开始或停止语音对讲功能',
+      talking: '对讲中',
+      dependenciesNotAvailable: '对讲依赖不可用，请安装相关包',
+    },
+  },
+  camera: {
+    empty: {
+      placeholder: '暂无画面',
+    },
+  },
+  common: {
+    close: '关闭',
+    confirm: '确认',
+    cancel: '取消',
+    loading: '加载中...',
+    pleaseWait: '请稍候',
+  },
+  lazyLoadImage: {
+    loading: '加载中...',
+    error: '图片加载失败',
+  },
+  playback: {
+    loading: '加载中...',
+    empty: '暂无回放数据',
+    thumbnail: {
+      alt: '回放缩略图',
+      empty: '暂无缩略图',
+    },
+    tools: {
+      rewind10: '快退 10 秒',
+      fastForward10: '快进 10 秒',
+      play: '播放',
+      pause: '暂停',
+      mute: '静音',
+      unmute: '取消静音',
+      fullscreen: '全屏',
+      exitFullscreen: '退出全屏',
+    },
+  },
+};

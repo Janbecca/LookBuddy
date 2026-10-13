@@ -1,0 +1,79 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "frameId": {
+      "maxLength": 70,
+      "minLength": 1,
+      "title": "Frameid",
+      "type": "string"
+    },
+    "capturedAt": {
+      "format": "date-time",
+      "title": "Capturedat",
+      "type": "string"
+    },
+    "source": {
+      "default": "webcam",
+      "enum": [
+        "webcam",
+        "eufy_web_sdk",
+        "replay",
+        "simulated"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "cameraHealthy": {
+      "default": true,
+      "title": "Camerahealthy",
+      "type": "boolean"
+    },
+    "quality": {
+      "enum": [
+        "observable",
+        "insufficient",
+        "unavailable"
+      ],
+      "title": "Quality",
+      "type": "string"
+    },
+    "posture": {
+      "default": "unknown",
+      "enum": [
+        "normal",
+        "bad",
+        "unknown"
+      ],
+      "title": "Posture",
+      "type": "string"
+    },
+    "presence": {
+      "enum": [
+        "present",
+        "seated",
+        "standing",
+        "away",
+        "unknown"
+      ],
+      "title": "Presence",
+      "type": "string"
+    },
+    "standingConfidence": {
+      "default": 0,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Standingconfidence",
+      "type": "number"
+    }
+  },
+  "required": [
+    "frameId",
+    "capturedAt",
+    "quality",
+    "presence"
+  ],
+  "title": "VisionSampleIn",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:VisionSampleIn"
+}

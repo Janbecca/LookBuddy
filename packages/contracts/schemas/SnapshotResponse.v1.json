@@ -1,0 +1,181 @@
+{
+  "$defs": {
+    "InterventionPublic": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "namespace": {
+          "enum": [
+            "live",
+            "demo"
+          ],
+          "title": "Namespace",
+          "type": "string"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "strategy": {
+          "title": "Strategy",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "context": {
+          "additionalProperties": true,
+          "title": "Context",
+          "type": "object"
+        },
+        "decision": {
+          "additionalProperties": true,
+          "title": "Decision",
+          "type": "object"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "displayed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Displayed At"
+        },
+        "due_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Due At"
+        }
+      },
+      "required": [
+        "id",
+        "session_id",
+        "namespace",
+        "category",
+        "strategy",
+        "status",
+        "source",
+        "context",
+        "decision",
+        "created_at",
+        "displayed_at",
+        "due_at"
+      ],
+      "title": "InterventionPublic",
+      "type": "object"
+    },
+    "ReminderPublic": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "priority": {
+          "title": "Priority",
+          "type": "integer"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "session_id",
+        "category",
+        "priority",
+        "status",
+        "message",
+        "reason_codes",
+        "created_at",
+        "expires_at"
+      ],
+      "title": "ReminderPublic",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "reminder": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReminderPublic"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "intervention": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InterventionPublic"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "SnapshotResponse",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:SnapshotResponse"
+}

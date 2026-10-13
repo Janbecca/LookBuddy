@@ -1,0 +1,69 @@
+{
+  "properties": {
+    "sessionId": {
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "capturedAt": {
+      "format": "date-time",
+      "title": "Capturedat",
+      "type": "string"
+    },
+    "presence": {
+      "enum": [
+        "online",
+        "away",
+        "offline"
+      ],
+      "title": "Presence",
+      "type": "string"
+    },
+    "sedentaryMs": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Sedentaryms",
+      "type": "integer"
+    },
+    "badPostureRatio5m": {
+      "default": 0,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Badpostureratio5M",
+      "type": "number"
+    },
+    "badPostureStreakMs": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Badposturestreakms",
+      "type": "integer"
+    },
+    "lastDrinkAt": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Lastdrinkat"
+    },
+    "fatigueSignals10m": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Fatiguesignals10M",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "sessionId",
+    "capturedAt",
+    "presence"
+  ],
+  "title": "StateSnapshotIn",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:StateSnapshotIn"
+}

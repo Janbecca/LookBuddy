@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "sessionId": {
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "category": {
+      "enum": [
+        "posture",
+        "sedentary",
+        "emotion"
+      ],
+      "title": "Category",
+      "type": "string"
+    },
+    "learning": {
+      "default": false,
+      "title": "Learning",
+      "type": "boolean"
+    },
+    "seed": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Seed"
+    }
+  },
+  "required": [
+    "sessionId",
+    "category"
+  ],
+  "title": "DemoInterventionIn",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:DemoInterventionIn"
+}

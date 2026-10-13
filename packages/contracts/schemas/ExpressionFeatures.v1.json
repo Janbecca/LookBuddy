@@ -1,0 +1,68 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "faceVisible": {
+      "title": "Facevisible",
+      "type": "boolean"
+    },
+    "frontal": {
+      "title": "Frontal",
+      "type": "boolean"
+    },
+    "lightingOk": {
+      "title": "Lightingok",
+      "type": "boolean"
+    },
+    "smile": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Smile",
+      "type": "number"
+    },
+    "browDown": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Browdown",
+      "type": "number"
+    },
+    "frown": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Frown",
+      "type": "number"
+    },
+    "mouthPress": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Mouthpress",
+      "type": "number"
+    },
+    "lookDown": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Lookdown",
+      "type": "number"
+    },
+    "eyeClosed": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Eyeclosed",
+      "type": "number"
+    }
+  },
+  "required": [
+    "faceVisible",
+    "frontal",
+    "lightingOk",
+    "smile",
+    "browDown",
+    "frown",
+    "mouthPress",
+    "lookDown",
+    "eyeClosed"
+  ],
+  "title": "ExpressionFeatures",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:ExpressionFeatures"
+}

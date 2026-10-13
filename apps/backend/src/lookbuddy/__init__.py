@@ -1,0 +1,2 @@
+"""LookBuddy backend package."""
+

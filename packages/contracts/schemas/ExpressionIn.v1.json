@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "ExpressionFeatures": {
+      "additionalProperties": false,
+      "properties": {
+        "faceVisible": {
+          "title": "Facevisible",
+          "type": "boolean"
+        },
+        "frontal": {
+          "title": "Frontal",
+          "type": "boolean"
+        },
+        "lightingOk": {
+          "title": "Lightingok",
+          "type": "boolean"
+        },
+        "smile": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Smile",
+          "type": "number"
+        },
+        "browDown": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Browdown",
+          "type": "number"
+        },
+        "frown": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Frown",
+          "type": "number"
+        },
+        "mouthPress": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Mouthpress",
+          "type": "number"
+        },
+        "lookDown": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Lookdown",
+          "type": "number"
+        },
+        "eyeClosed": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Eyeclosed",
+          "type": "number"
+        }
+      },
+      "required": [
+        "faceVisible",
+        "frontal",
+        "lightingOk",
+        "smile",
+        "browDown",
+        "frown",
+        "mouthPress",
+        "lookDown",
+        "eyeClosed"
+      ],
+      "title": "ExpressionFeatures",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "expressionId": {
+      "maxLength": 64,
+      "minLength": 8,
+      "title": "Expressionid",
+      "type": "string"
+    },
+    "sessionId": {
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "namespace": {
+      "default": "live",
+      "enum": [
+        "live",
+        "demo"
+      ],
+      "title": "Namespace",
+      "type": "string"
+    },
+    "source": {
+      "default": "webcam",
+      "enum": [
+        "webcam",
+        "eufy_web_sdk",
+        "simulated",
+        "replay"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "capturedAt": {
+      "format": "date-time",
+      "title": "Capturedat",
+      "type": "string"
+    },
+    "cameraHealthy": {
+      "default": true,
+      "title": "Camerahealthy",
+      "type": "boolean"
+    },
+    "quality": {
+      "enum": [
+        "observable",
+        "insufficient",
+        "unavailable"
+      ],
+      "title": "Quality",
+      "type": "string"
+    },
+    "features": {
+      "$ref": "#/$defs/ExpressionFeatures"
+    }
+  },
+  "required": [
+    "expressionId",
+    "sessionId",
+    "capturedAt",
+    "quality",
+    "features"
+  ],
+  "title": "ExpressionIn",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:ExpressionIn"
+}

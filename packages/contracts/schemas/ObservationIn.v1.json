@@ -1,0 +1,52 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "observationKey": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Observationkey",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "action_started",
+        "action_completed",
+        "sustained_improvement",
+        "recurrence",
+        "expression_change",
+        "unknown"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "quality": {
+      "enum": [
+        "observable",
+        "insufficient",
+        "unavailable"
+      ],
+      "title": "Quality",
+      "type": "string"
+    },
+    "observedAt": {
+      "format": "date-time",
+      "title": "Observedat",
+      "type": "string"
+    },
+    "evidence": {
+      "additionalProperties": true,
+      "title": "Evidence",
+      "type": "object"
+    }
+  },
+  "required": [
+    "observationKey",
+    "kind",
+    "quality",
+    "observedAt"
+  ],
+  "title": "ObservationIn",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:ObservationIn"
+}

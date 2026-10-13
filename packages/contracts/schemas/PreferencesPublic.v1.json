@@ -1,0 +1,57 @@
+{
+  "properties": {
+    "sedentaryMinutes": {
+      "default": 60,
+      "enum": [
+        30,
+        60,
+        90
+      ],
+      "title": "Sedentaryminutes",
+      "type": "integer"
+    },
+    "breakMinutes": {
+      "default": 10,
+      "enum": [
+        5,
+        10,
+        15,
+        20
+      ],
+      "title": "Breakminutes",
+      "type": "integer"
+    },
+    "busy": {
+      "default": false,
+      "title": "Busy",
+      "type": "boolean"
+    },
+    "postureEnabled": {
+      "default": true,
+      "title": "Postureenabled",
+      "type": "boolean"
+    },
+    "companionEnabled": {
+      "default": true,
+      "title": "Companionenabled",
+      "type": "boolean"
+    },
+    "updatedAt": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Updatedat"
+    }
+  },
+  "title": "PreferencesPublic",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:PreferencesPublic"
+}

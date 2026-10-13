@@ -1,0 +1,80 @@
+{
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "sessionId": {
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "namespace": {
+      "title": "Namespace",
+      "type": "string"
+    },
+    "capturedAt": {
+      "format": "date-time",
+      "title": "Capturedat",
+      "type": "string"
+    },
+    "quality": {
+      "title": "Quality",
+      "type": "string"
+    },
+    "suggestedLabel": {
+      "enum": [
+        "good",
+        "focused",
+        "joyful",
+        "possibly_stressed",
+        "possibly_low",
+        "possibly_angry",
+        "unknown"
+      ],
+      "title": "Suggestedlabel",
+      "type": "string"
+    },
+    "confidence": {
+      "title": "Confidence",
+      "type": "number"
+    },
+    "stableDurationMs": {
+      "title": "Stabledurationms",
+      "type": "integer"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "features": {
+      "additionalProperties": true,
+      "title": "Features",
+      "type": "object"
+    },
+    "interpretation": {
+      "const": "visible_expression_hypothesis",
+      "default": "visible_expression_hypothesis",
+      "title": "Interpretation",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "sessionId",
+    "namespace",
+    "capturedAt",
+    "quality",
+    "suggestedLabel",
+    "confidence",
+    "stableDurationMs",
+    "reasonCodes",
+    "features"
+  ],
+  "title": "ExpressionPublic",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:ExpressionPublic"
+}

@@ -1,0 +1,34 @@
+{
+  "properties": {
+    "action": {
+      "enum": [
+        "accepted",
+        "snoozed",
+        "ignored"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "snoozeMinutes": {
+      "anyOf": [
+        {
+          "maximum": 120,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Snoozeminutes"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "title": "ReminderRespondRequest",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:ReminderRespondRequest"
+}

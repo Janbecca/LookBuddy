@@ -1,0 +1,22 @@
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+*.aar filter=lfs diff=lfs merge=lfs -text
+*.apk binary
+*.jar binary
+*.so binary
+*.dll binary
+*.exe binary
+*.zip binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.wasm binary
+*.task binary
+*.db binary
+

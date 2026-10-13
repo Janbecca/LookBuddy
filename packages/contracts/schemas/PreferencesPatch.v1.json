@@ -1,0 +1,80 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "sedentaryMinutes": {
+      "anyOf": [
+        {
+          "enum": [
+            30,
+            60,
+            90
+          ],
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sedentaryminutes"
+    },
+    "breakMinutes": {
+      "anyOf": [
+        {
+          "enum": [
+            5,
+            10,
+            15,
+            20
+          ],
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Breakminutes"
+    },
+    "busy": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Busy"
+    },
+    "postureEnabled": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Postureenabled"
+    },
+    "companionEnabled": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Companionenabled"
+    }
+  },
+  "title": "PreferencesPatch",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:PreferencesPatch"
+}
