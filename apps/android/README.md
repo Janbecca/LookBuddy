@@ -4,7 +4,7 @@
 
 ## 构建和启动
 
-JDK 17、Android SDK 36、Gradle 8.13、AGP 8.11.1、Kotlin 2.2.21：
+JDK 17、Android SDK 36、min SDK 24、Gradle 8.13、AGP 8.11.1、Kotlin 2.2.21：
 
 ```powershell
 cd apps/android
@@ -12,6 +12,8 @@ cd apps/android
 ```
 
 APK：`app/build/outputs/apk/debug/app-debug.apk`。可用 `adb install -r` 安装到自己的测试设备。当前无已配置的 AVD / 系统镜像，未验证安装、界面操作或 Keystore 在设备上的表现。
+
+主办方开发指南标注 SDK 本身支持 API 24，官方示例 App 使用 API 26。LookBuddy 使用 API 24 并通过完整构建检查；仍需在 Android 7.0/API 24 真机或模拟器上验证启动、SDK 初始化与核心页面。
 
 macOS / Linux 首次执行 `chmod +x ./gradlew`，之后使用 `./gradlew`；Windows 使用
 `.\gradlew.bat`。脚本保持各平台原生入口，

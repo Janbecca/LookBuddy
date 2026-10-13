@@ -187,7 +187,8 @@ T8171 / T8214
 - 已接入官方 `ESIotKit-2.2.7.aar`，SHA-256 为
   `27916001D9F973361910E2A59DA3A870F540F3038816DFC6141B3D33C633F87A`。
 - 已对齐官方 Android 工具链：JDK 17、Gradle 8.13、AGP 8.11.1、
-  Kotlin 2.2.21、compile/target SDK 36、min SDK 26。
+  Kotlin 2.2.21、compile/target SDK 36、min SDK 24。主办方示例 App 使用 26，
+  但开发指南标明 SDK 本身支持 24；LookBuddy 选择赛事最低版本并完成构建验证。
 - 已完成内存鉴权、设备/型号/在线状态、24 小时事件查询、事件缩略图和隐私模式控制。
 - 控制前检查在线状态、物模型 capability 与写权限；UI 必须二次确认。
 - `-1002/-1003/-1004`、30 秒 ACK 超时、离线及空设备/空事件均显示真实恢复提示，不伪造成功。

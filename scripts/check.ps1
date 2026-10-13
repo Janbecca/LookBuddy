@@ -40,6 +40,15 @@ Push-Location "$projectRoot\apps\android"
 try {
     .\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon
     if ($LASTEXITCODE -ne 0) { throw 'Android checks failed' }
+
+    $mergedManifest = '.\app\build\intermediates\merged_manifest\debug\processDebugMainManifest\AndroidManifest.xml'
+    if (-not (Test-Path -LiteralPath $mergedManifest)) {
+        throw "Merged Android manifest not found: $mergedManifest"
+    }
+    $manifestText = Get-Content -LiteralPath $mergedManifest -Raw
+    if ($manifestText -notmatch 'android:minSdkVersion="24"') {
+        throw 'Android minSdk regression: the built debug manifest must declare API 24.'
+    }
 } finally {
     Pop-Location
 }

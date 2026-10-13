@@ -8,7 +8,7 @@
 
 - JDK 17、Kotlin 2.2.21。
 - Android Gradle Plugin 8.11.1、Gradle 8.13。
-- `compileSdk=36`、`targetSdk=36`、`minSdk=26`。
+- `compileSdk=36`、`targetSdk=36`、`minSdk=24`。主办方 SDK 标称支持 24，示例 App 使用 26。
 - Jetpack Compose + Material 3。
 - 官方 `ESIotKit-2.2.7.aar` 及其运行时依赖。
 - Windows 使用 `gradlew.bat`；macOS/Linux 使用 LF 格式的 `gradlew`。
@@ -46,10 +46,13 @@ cd apps/android
 - 1 项真实后端集成测试因未配置地址跳过。
 - Android Lint：0 error。
 - APK：`app/build/outputs/apk/debug/app-debug.apk`。
+- 最终 APK 与合并 Manifest 均声明 `minSdkVersion=24`、`targetSdkVersion=36`；
+  API 24 下的 AAR 元数据检查、Manifest 合并、D8/L8 脱糖和打包全部通过。
 
 ## 尚待验收
 
 - 使用赛事真实凭证完成鉴权。
+- 在 Android 7.0/API 24 真机或模拟器验证启动、SDK 初始化和核心页面。
 - 在 T8171/T8214 上核对在线状态、真实事件与缩略图。
 - 二次确认后执行一次隐私模式控制，并观察设备状态变化。
 - 连续运行 15 分钟及断网/离线/超时恢复。

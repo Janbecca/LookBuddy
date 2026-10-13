@@ -13,7 +13,9 @@ android {
 
     defaultConfig {
         applicationId = "com.lookbuddy.app"
-        minSdk = 26
+        // The organizer SDK supports API 24. Their sample app uses 26, but the
+        // competition baseline requires the submitted integration to support 24.
+        minSdk = 24
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"

@@ -9,7 +9,7 @@
 | 平台 | 官方约束 | 本项目落实 |
 |---|---|---|
 | Web | Node 18+、pnpm、TypeScript、Vite、React | `apps/web` 使用 React 18、TypeScript 5、Vite 6 |
-| Android | JDK 17、compileSdk >= 34、minSdk <= 24 | JDK 17、`compileSdk=36`、当前 `minSdk=26`；App SDK 2.2.7 已接入，但最低系统版本与赛事基线仍有差距，发布前必须确认或兼容到 API 24 |
+| Android | JDK 17、compileSdk >= 34；资料中同时出现 SDK minSdk 24、示例 App minSdk 26 和直播页 minSdk ≤ 24 | JDK 17、`compileSdk=36`、`minSdk=24`；既采用 SDK 标称下限，也满足直播页口径，App SDK 2.2.7 已接入 |
 | AI | 主办方 Router，兼容 OpenAI / Anthropic 协议 | 仅后端读取环境变量并调用 |
 
 ## SDK 能力边界
@@ -25,6 +25,7 @@
 ### Android App SDK
 
 - App SDK 2.2.7 提供设备信息、在线状态、事件/缩略图及能力受控的设备控制，是满足“视频流之外信息 + 设备控制”的主路径。
+- 主办方开发指南说明 SDK 本身支持 minSdk 24，官方示例 App 为方便演示使用 26；LookBuddy 选择 API 24，并以 Gradle 完整构建确认传递依赖可合并。
 - 推荐从官方 Android Demo 和 fat-AAR 对齐 Gradle、初始化、权限及 JNI 配置。
 - 设备控制必须由明确用户操作触发，并在调用前检查 capability、在线状态及隐私限制。
 - 局域网能力依赖手机与设备处于可互通网络；现场须提前验证 AP 隔离等网络条件。

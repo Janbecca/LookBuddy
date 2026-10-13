@@ -2,7 +2,7 @@
 
 | 脚本 | 用途 |
 |---|---|
-| `check.ps1` | Windows 下一次运行后端、脚本、Web、桌面和 Android 检查 |
+| `check.ps1` | Windows 下一次运行后端、脚本、Web、桌面和 Android 检查，并防止 Android minSdk 从 API 24 回退 |
 | `export_contracts.py` | 从后端模型导出共享 JSON Schema |
 | `demo_preflight.py` | 演示前只读检查环境、资源和服务状态 |
 | `acceptance_api.py` | 后端接口验收辅助脚本 |

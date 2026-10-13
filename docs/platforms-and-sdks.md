@@ -7,7 +7,7 @@
 | Web | React 18、TypeScript 5.7、Vite 6、MediaPipe Tasks Vision | Node.js 22.12+、pnpm 10.28 |
 | Desktop | Electron 44.7、`@electron/packager` 20.3 | Windows x64、Node.js 22.12+ |
 | Backend | Python 3.11、FastAPI、SQLAlchemy、SQLite | Python 3.11、uv |
-| Android | Kotlin 2.2.21、Compose、AGP 8.11.1、Gradle 8.13 | JDK 17、Android SDK 36、min SDK 26 |
+| Android | Kotlin 2.2.21、Compose、AGP 8.11.1、Gradle 8.13 | JDK 17、Android SDK 36、min SDK 24 |
 
 锁定版本以各模块的 `package.json`、`pyproject.toml`、Gradle 文件和 `pnpm-lock.yaml` 为准，本页只用于快速理解。
 
@@ -28,6 +28,8 @@ Web 运行时需要：`appName`、`clientId`、`clientSecret`、`presetKey`、`e
 - 大小：94,107,807 bytes
 - SHA-256：`27916001D9F973361910E2A59DA3A870F540F3038816DFC6141B3D33C633F87A`
 - 用途：设备列表和在线状态、24 小时事件查询、事件缩略图、隐私模式控制。
+
+主办方开发指南标注 SDK 的 minSdk 为 24，官方示例 App 为 26。LookBuddy 使用 API 24，以覆盖赛事最低版本；AAR 自身 Manifest 不会抬高该值。编译通过只证明依赖可合并，API 24 真机仍需单独验收。
 
 Android 运行时需要：`appName`、`clientId`、`userId`、`authorization/token`、HTTPS `appDomain`、HTTPS `deviceDomain`、`presetKey`。这些值只保留在当前进程内，成功连接后清空 token 输入框，断开后清空 SDK 会话。
 
