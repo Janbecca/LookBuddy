@@ -31,8 +31,8 @@ android {
         applicationId = "com.lookbuddy.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12
-        versionName = "1.6.2"
+        versionCode = 13
+        versionName = "1.6.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "LOOKBUDDY_DESKTOP_URL", buildConfigString(desktopPetUrl))

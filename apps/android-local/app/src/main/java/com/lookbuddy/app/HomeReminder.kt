@@ -220,27 +220,31 @@ internal fun HomeReminderBubble(
     }
     var last by remember { mutableStateOf(event) }
     SideEffect { if (event != null) last = event }
-    val fontScale = LocalDensity.current.fontScale
-    // Keep Figma's height at standard font size; grow downward for accessibility while staying in the left lane.
-    val h = 155f + (fontScale - 1f).coerceAtLeast(0f) * 95f
+    // Content sizes the card; the small visible pill retains a full 44dp touch target.
     AnimatedVisibility(event != null && !hidden, enter = fadeIn(tween(200)), exit = fadeOut(tween(200)),
         modifier = Modifier.offset(x = 22.dp * s, y = 198.dp * verticalScale)) {
         val display = event ?: last
-        if (display != null) Column(Modifier.width(162.dp * s).heightIn(min = h.dp * s)
-            .clip(RoundedCornerShape(70.dp * s)).background(Color.White.copy(alpha = .48f))
-            .testTag("home_reminder_bubble").padding(15.dp * s),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp * s)) {
-            Text(display.message, color = CompanionMuted, fontSize = (15f * s).sp, lineHeight = (22.5f * s).sp,
-                textAlign = TextAlign.Center, modifier = Modifier.width(120.dp * s).testTag("reminder_message"))
-            if (display.kind.buttonLabel != null) Box(Modifier.width(104.dp * s).heightIn(min = maxOf(44.dp, 44.dp * s))
-                .clip(RoundedCornerShape(22.dp * s)).background(Color.White.copy(alpha = .48f))
+        if (display != null) Column(Modifier.width(162.dp * s)
+            .clip(RoundedCornerShape(30.dp * s)).background(Color.White.copy(alpha = .64f))
+            .testTag("home_reminder_bubble").padding(start = 18.dp * s, end = 18.dp * s,
+                top = 20.dp * s, bottom = (if (display.kind.buttonLabel != null) 10 else 20).dp * s),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp * s)) {
+            Text(display.message, color = CompanionInk, fontSize = (15f * s).sp, lineHeight = (24f * s).sp,
+                textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().testTag("reminder_message"))
+            if (display.kind.buttonLabel != null) Box(Modifier.width(80.dp * s)
+                .heightIn(min = maxOf(44.dp, 44.dp * s))
                 .clickable(enabled = event?.id == display.id && !hidden, role = Role.Button) {
                     val current = controller.active
                     controller.acknowledge()?.let(onAcknowledged)
                     if (current?.kind?.opensChat == true) onChat(current)
                     if (current?.kind == HomeReminderKind.DiaryReady) onDiary()
                 }.testTag("acknowledge_reminder"), contentAlignment = Alignment.Center) {
-                Text(display.kind.buttonLabel.orEmpty(), color = CompanionInk, fontSize = (15f * s).sp, lineHeight = (22f * s).sp)
+                Box(Modifier.fillMaxWidth().heightIn(min = 28.dp * s)
+                    .clip(RoundedCornerShape(14.dp * s)).background(Color.White.copy(alpha = .55f))
+                    .padding(horizontal = 10.dp * s, vertical = 4.dp * s), contentAlignment = Alignment.Center) {
+                    Text(display.kind.buttonLabel.orEmpty(), color = CompanionClay,
+                        fontSize = (13f * s).sp, lineHeight = (20f * s).sp)
+                }
             }
         }
     }

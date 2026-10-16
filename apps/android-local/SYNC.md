@@ -34,3 +34,5 @@
 - 2026-10-16 桌宠0.2场景统一：正式工程为桌面宠物/LookBuddy_Desktop；饮水/久坐/坐姿/疲劳/开心/关心/早间七种动作复用App首页原始WebP，manifest登记Git blob SHA。晚间保留看电视吃薯片，diary_ready保持当前日夜默认态，新增接收约定但后端自动生产尚未接入。Android首页局域网桥接转发当前提醒种类、事件ID和默认场景；提醒结束恢复默认，同ID不重播，新ID重播，播完保持末帧。22项桌宠单元/HTTP测试、7种真实Electron场景截图及末帧/去重测试通过；Android52项测试与调试包构建通过。原有完整窗口回归在本机出现464×460尺寸差异与置顶恢复失败，未声称完整桌宠回归通过。未安装手机App。具体同步提交及核对范围见工作区output/desktop-scene-sync/sync-result.json；不更新main/apps/android/apps/desktop/apps/backend，保留旧desktop及根README差异。实际D盘工程仍无.git；本次使用工作区隔离Git仓库读取最新分支并尝试普通提交推送，不代表后台同步。
 
 - 2026-10-16 App 1.6.2：首页IP和气泡整体适度下移，最大32dp并按陪伴标语/统计面板剩余空间限制位移，默认态大小不变；所有首页提醒/问候/日记提醒气泡删除主标题，仅保留15sp、CompanionMuted色的提示正文及原按钮。同步记录见工作区output/lookbuddy-home-spacing/sync-result.json。
+
+- 2026-10-16 App 1.6.3 首页提醒气泡重排：正文采用深色15sp/24sp行高并增加背景对比度，取消固定155dp高度，30dp圆角内容自适应卡片；按钮视觉收为80dp宽、约28dp高的小胶囊，仍保留至少44dp点击区域。保留无标题、原按钮动作及IP位置/尺寸。同步记录见工作区output/lookbuddy-bubble-layout/sync-result.json。
