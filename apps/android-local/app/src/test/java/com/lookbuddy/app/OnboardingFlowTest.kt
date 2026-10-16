@@ -3,6 +3,8 @@ package com.lookbuddy.app
 import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
@@ -111,6 +113,54 @@ class OnboardingFlowTest {
     @Test fun oldRegistrationStillShowsTheNewOnboardingFlow() {
         preferences.edit().putBoolean("completed", true).commit()
         launch()
+        compose.onNodeWithTag("page_Greeting").assertExists()
+    }
+
+    @Test fun splashIsVisibleBeforeFreshRegistrationStarts() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent { MaterialTheme { LookBuddyStartup { Text("已进入首页") } } }
+        compose.onNodeWithTag("page_Splash").assertExists()
+        compose.mainClock.advanceTimeBy(2000)
+        compose.onNodeWithTag("page_Splash").assertExists()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithTag("page_Greeting").assertExists()
+    }
+
+    @Test fun registeredUserCanReplayIntroductionAndCancelWithoutLosingData() {
+        preferences.edit().putBoolean("completed", true).putInt("flow_version", 2).putString("nickname", "我的昵称").commit()
+        compose.setContent {
+            MaterialTheme {
+                LookBuddyStartup {
+                    val replay = LocalReplayIntroduction.current
+                    Column {
+                        Text("已进入首页")
+                        TextButton(onClick = replay) { Text("重新体验初次见面") }
+                    }
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(3000)
+        compose.onNodeWithText("重新体验初次见面").performClick()
+        compose.onNodeWithTag("page_Splash").assertExists()
+        compose.mainClock.advanceTimeBy(3000)
+        compose.onNodeWithTag("page_Greeting").assertExists()
+        compose.onNodeWithTag("exit_introduction").performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithText("已进入首页").assertExists()
+        assertTrue(preferences.getBoolean("completed", false))
+        org.junit.Assert.assertEquals("我的昵称", preferences.getString("nickname", null))
+    }
+
+    @Test fun personalSettingsReplayEntryOpensTheFullStartupFlow() {
+        preferences.edit().putBoolean("completed", true).putInt("flow_version", 2).commit()
+        compose.setContent {
+            MaterialTheme { LookBuddyStartup { LookBuddyApp(initialPage = CompanionPage.Settings) } }
+        }
+        compose.mainClock.advanceTimeBy(3000)
+        compose.onNodeWithTag("settings_settings_system").performClick()
+        compose.onNodeWithTag("replay_introduction").performClick()
+        compose.onNodeWithTag("page_Splash").assertExists()
+        compose.mainClock.advanceTimeBy(3000)
         compose.onNodeWithTag("page_Greeting").assertExists()
     }
 }

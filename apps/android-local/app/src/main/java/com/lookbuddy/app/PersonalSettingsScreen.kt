@@ -52,6 +52,7 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val replayIntroduction = LocalReplayIntroduction.current
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     fun open(name: String) { error = null; editing = nickname; dialog = name }
@@ -132,6 +133,12 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
                     "账号安全" -> Text("当前为本地体验，尚未接入真实账号登录。昵称和心情记录保存在这台设备上。", color = CompanionMuted)
                     "系统设置" -> Text("可在 Android 应用设置中管理 LookBuddy 的权限、通知和存储。", color = CompanionMuted)
                     "设备连接" -> Text("在陪伴视角查看摄像头连接状态、原视频和记录高光时刻。", color = CompanionMuted)
+                }
+                if (selected == "系统设置") TextButton(onClick = {
+                    dialog = null
+                    replayIntroduction()
+                }, modifier = Modifier.testTag("replay_introduction")) {
+                    Text("重新体验初次见面", color = CompanionClay)
                 }
                 error?.let { Text(it, color = CompanionClay) }
             } },

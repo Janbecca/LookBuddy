@@ -18,3 +18,7 @@ local.properties
 /backend/.env
 /backend/__pycache__/
 /backend/*.pyc
+
+# 原始字体压缩包留在本机，实际使用的字体在 res/font 中同步
+/字体.rar
+

@@ -1,10 +1,10 @@
 # LookBuddy 工位搭子
 
-这份项目基于现有 Compose 工程，新增 Figma 的启动及首次注册流程。最终代码同步在 `D:/Everything/Anker/projects/lookbuddy`，当前工作目录的 `LookBuddy` 保留相同版本副本。请在 Android Studio 打开 `D:/Everything/Anker/projects/lookbuddy`，等待 Gradle 同步后，连接手机并点击 Run ▶。
+这份项目基于现有 Compose 工程，新增 Figma 的启动及首次注册流程。实际工程为 `D:/Everything/Anker/projects/lookbuddy`，GitHub 对应 `apps/android-local`；工作区其他副本仅作历史资料。请在 Android Studio 打开 `D:/Everything/Anker/projects/lookbuddy`，等待 Gradle 同步后，连接手机并点击 Run ▶。
 
 ## 已实现
 
-1. 开屏动画：角色淡入、缩放、轻微浮动，约 2.4 秒后自动进入下一页。
+1. 开屏动画：静态角色图片淡入、轻微缩放，约 2.4 秒后自动进入下一页。
 2. 首次注册：打招呼 → LookBuddy 自我介绍 → 缘分不简单 → 链接设备预告 → buddy 询问 → 手机验证 → 设备连接 → 正式介绍 → 首页-早上-wyr。
 3. 每个对话页的两个回复都进入下一页。Android 返回键可返回上一个注册页。
 4. 昵称、手机号、验证码接受任意字符，也接受空输入。无需点击获取验证码即可登录。
@@ -14,7 +14,7 @@
 8. 晨间首页使用 Figma 原始背景、桌前角色和 SVG 图标；点击统计便当顶部或上滑可展开，展开后仅下滑收起；拖动跟随手指，松手后平滑吸附，顶部不显示灰色点击反馈，底部中间图标现进入陪伴日记。
 7. 输入键盘出现或屏幕空间不足时页面可以滚动。
 
-设备列表和统计数据目前是演示数据，点击连接不需要真实蓝牙设备。本次未接入设备 SDK。字体按用户要求使用系统字体。
+设备列表和统计数据目前是演示数据，点击连接不需要真实蓝牙设备。本次未接入设备 SDK。开屏和首次注册按最新 Figma 使用用户提供的离线字体，详见 FONTS.md；其他页面沿用现有字体。
 
 ## GLM 关心语气泡
 
@@ -50,7 +50,7 @@
 
 ## 重新体验首次注册
 
-在手机「设置 → 应用 → LookBuddy → 存储」中清除应用数据。开发时也可执行：
+优先从「个人设置 → 系统设置 → 重新体验初次见面」进入完整流程，可返回首页并保留现有数据。仅开发调试需要彻底重置时，才在系统应用设置清除数据，或执行：
 
 ```powershell
 & 'D:/Everything/Anker/Android/platform-tools/adb.exe' shell pm clear com.lookbuddy.app
@@ -76,7 +76,7 @@ $env:JAVA_HOME='D:/Everything/Anker/Android studio/jbr'
 ./gradlew.bat :app:updateDebugScreenshotTest
 ```
 
-调试 APK 在 `app/build/outputs/apk/debug/app-debug.apk`。截图在 `app/src/screenshotTestDebug/reference`，可用于检查系统字体版本下的布局。
+调试 APK 在 `app/build/outputs/apk/debug/app-debug.apk`。截图在 `app/src/screenshotTestDebug/reference`，可用于检查内置字体和不同屏幕尺寸下的布局。
 
 1.1 版已验证：调试 APK 编译成功；5 个注册流程测试和 2 个统计便当交互测试通过；新增设备连接、正式介绍、晨间首页、便当展开及填写昵称后的截图已渲染并核对。Windows 下截图和本地测试工具需要英文项目路径，请使用上述 D 盘主工程运行这些命令。
 
@@ -100,11 +100,17 @@ https://www.figma.com/design/MrMMdAMDddch9OUQz9NIVQ/Untitled?node-id=0-1
 | 首页-早上-wyr | 114:4399 |
 | 首页-早上-wyr / 统计便当展开 | 142:2144 |
 
-Figma 中 iPhone 状态栏和底部指示条由 Android 原生系统栏替代。角色各页使用同一原图，以 `ContentScale.Crop` 呈现在原稿 168 × 186 的图层槽位中。
+Figma 中 iPhone 状态栏和底部指示条由 Android 原生系统栏替代。1.2 开屏与注册以 Figma Page 2 为准（节点见 FONTS.md），使用同一静态 IP 原图及各页对应尺寸的图层槽位。下表保留早期设计节点用于追溯。
 
 
 ## 陪伴日记、陪伴视角与个人设置
 
 三个页面现已接入主 App。首页右上角摄像头打开陪伴视角，底部中间打开陪伴日记，右侧打开个人设置。摄像头使用可替换的 CameraFeed 接口，当前默认显示待连接状态；真实设备、实时识别和录像由后续适配器接入。日记是明确标记的设计稿示例，昵称修改保存在本机。入口、接口契约和验证方式见 [CAMERA_INTEGRATION.md](CAMERA_INTEGRATION.md)。
 
+
+
+
+## 1.2 开屏与首次注册
+
+按 Figma Page 2 更新开屏和八个首次注册页面，内置字体包中的 FontQu Smile 与霞鹜文楷 Light，并使用设计稿静态 IP 原图。已注册设备会在开屏后进入首页；可从「个人设置 → 系统设置 → 重新体验初次见面」重看全部流程，随时返回首页，保留现有数据。短信和蓝牙连接仍是本地演示。图片替换入口和字体说明见 [FONTS.md](FONTS.md)。
 

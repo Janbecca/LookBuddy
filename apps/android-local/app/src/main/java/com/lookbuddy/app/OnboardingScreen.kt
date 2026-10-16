@@ -4,10 +4,6 @@ import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -20,6 +16,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -42,6 +40,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -58,6 +58,9 @@ private val BuddyClay = Color(0xFFB4745C)
 private val BuddyInk = Color(0xFF030100)
 private val BuddyHint = Color(0xFFAAAAAA)
 private val Pill = RoundedCornerShape(40.dp)
+internal val OnboardingHandwriting = FontFamily(Font(R.font.fontqu_smile))
+internal val OnboardingDeviceFont = FontFamily(Font(R.font.lxgw_wenkai_light))
+internal val LocalReplayIntroduction = staticCompositionLocalOf<() -> Unit> { {} }
 
 internal enum class StartupStep {
     Splash, Greeting, Introduction, Destiny, ConnectionTeaser, Nickname, Phone, DeviceConnection, FormalIntroduction, Home;
@@ -76,6 +79,7 @@ internal fun LookBuddyStartup(home: @Composable () -> Unit) {
     var phone by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
     var codeRequested by rememberSaveable { mutableStateOf(false) }
+    var replaying by rememberSaveable { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
@@ -83,11 +87,14 @@ internal fun LookBuddyStartup(home: @Composable () -> Unit) {
     LaunchedEffect(step, registered) {
         if (step == StartupStep.Splash) {
             delay(2400)
-            step = if (registered) StartupStep.Home else StartupStep.Greeting
+            step = if (registered && !replaying) StartupStep.Home else StartupStep.Greeting
         } else if (step == StartupStep.Home && !registered) {
             // An old saved Activity state must not skip the newly added connection screens.
             step = StartupStep.Greeting
         }
+    }
+    BackHandler(enabled = replaying && step == StartupStep.Greeting) {
+        replaying = false; step = StartupStep.Home
     }
     BackHandler(enabled = step != StartupStep.Splash && step != StartupStep.Home && step != StartupStep.Greeting) {
         if (keyboardVisible) { keyboard?.hide(); focus.clearFocus() }
@@ -100,10 +107,17 @@ internal fun LookBuddyStartup(home: @Composable () -> Unit) {
             preferences.edit().putBoolean("completed", true).putInt("flow_version", 2)
                 .putString("nickname", nickname).apply()
             registered = true
+            replaying = false
         }
         step = step.next()
     }
 
+    CompositionLocalProvider(LocalReplayIntroduction provides {
+        keyboard?.hide(); focus.clearFocus()
+        nickname = preferences.getString("nickname", "") ?: ""
+        phone = ""; code = ""; codeRequested = false
+        replaying = true; step = StartupStep.Splash
+    }) {
     Box(Modifier.fillMaxSize().background(if (step == StartupStep.Home) Color.White else BuddyCream)) {
         Crossfade(targetState = step, animationSpec = tween(280), label = "startup page") { visibleStep ->
             if (visibleStep == StartupStep.Home) {
@@ -115,6 +129,12 @@ internal fun LookBuddyStartup(home: @Composable () -> Unit) {
                     onNext = { if (visibleStep == step) advance() })
             }
         }
+        if (replaying) TextButton(onClick = {
+            keyboard?.hide(); focus.clearFocus(); replaying = false; step = StartupStep.Home
+        }, modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().testTag("exit_introduction")) {
+            Text("返回首页", color = BuddyClay, fontSize = 14.sp)
+        }
+    }
     }
 }
 
@@ -138,6 +158,7 @@ internal fun StartupPage(
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val dismissKeyboard = { keyboard?.hide(); focus.clearFocus() }
+    CompositionLocalProvider(LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = OnboardingHandwriting)) {
     BoxWithConstraints(Modifier.fillMaxSize().background(BuddyCream).systemBarsPadding().imePadding()) {
         val scale = (maxWidth.value / 393f).coerceAtMost(1.35f)
         val density = LocalDensity.current
@@ -150,19 +171,18 @@ internal fun StartupPage(
             .semantics { contentDescription = step.name }.testTag("page_${step.name}"),
             horizontalAlignment = Alignment.CenterHorizontally) {
             if (step == StartupStep.Splash) {
-                Spacer(Modifier.height(designTop + (313f - 62f).dp * scale))
-                if (animateSplash) SplashBuddy(scale) else BuddyImage(scale, horizontalOffset = 0f)
-                Spacer(Modifier.height(3.dp * scale))
+                Spacer(Modifier.height(designTop + (300f - 62f).dp * scale))
+                if (animateSplash) SplashBuddy(scale) else BuddyImage(scale, step)
+                Spacer(Modifier.height(10.dp * scale))
                 Text("I am LookBuddy\n我来陪你了！", Modifier.fillMaxWidth(), color = BuddyInk,
                     fontSize = (24f * scale).sp, lineHeight = (26f * scale).sp, textAlign = TextAlign.Center)
                 Spacer(Modifier.weight(1f))
             } else if (step == StartupStep.Phone) {
-                Spacer(Modifier.height(designTop + 65.dp * scale))
-                StoryText("登陆一下吧~", scale, Modifier.height(39.dp * scale))
+                Spacer(Modifier.height(designTop + 45.dp * scale))
+                StoryText("啊偶\n还需要登陆一下捏~", scale, Modifier.height(78.dp * scale))
+                BuddyImage(scale, step)
                 Spacer(Modifier.height(18.dp * scale))
-                BuddyImage(scale)
-                // The image frame's transparent bottom overlaps the phone field by 6 px in Figma.
-                Column(Modifier.fillMaxWidth().offset(y = (-6).dp * scale).padding(horizontal = 20.dp * scale),
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp * scale),
                     verticalArrangement = Arrangement.spacedBy(21.dp * scale)) {
                     BuddyInput(phone, onPhone, "输入手机号", "phone", scale,
                         imeAction = ImeAction.Next)
@@ -184,27 +204,31 @@ internal fun StartupPage(
                 Spacer(Modifier.height(designTop))
                 val top = when (step) {
                     StartupStep.Greeting -> 144f
-                    StartupStep.Introduction -> 115f
-                    StartupStep.Destiny -> 76f
-                    StartupStep.DeviceConnection -> 115f
-                    StartupStep.FormalIntroduction -> 76f
-                    else -> 134f
+                    StartupStep.Introduction -> 102f
+                    StartupStep.Destiny -> 63f
+                    StartupStep.DeviceConnection -> 95f
+                    StartupStep.FormalIntroduction -> 63f
+                    else -> 155f
                 }
                 val lines = when (step) {
                     StartupStep.Greeting -> 3
                     StartupStep.Introduction -> 4
                     StartupStep.Destiny -> 5
-                    StartupStep.DeviceConnection -> 3
+                    StartupStep.DeviceConnection -> 4
                     StartupStep.FormalIntroduction -> 5
                     else -> 2
                 }
                 // Story and character use their Figma slots; controls are regular column/row layouts.
-                Box(Modifier.fillMaxWidth().height(271.dp * scale)) {
+                Box(Modifier.fillMaxWidth().height(258.dp * scale)) {
                     StoryText(story(step), scale,
                         Modifier.padding(top = top.dp * scale).height((lines * 39).dp * scale))
                 }
-                BuddyImage(scale)
-                Spacer(Modifier.height((if (step == StartupStep.DeviceConnection) 12f else 25f).dp * scale))
+                BuddyImage(scale, step)
+                Spacer(Modifier.height(when (step) {
+                    StartupStep.DeviceConnection -> 25.dp
+                    StartupStep.FormalIntroduction -> 12.dp
+                    else -> 34.dp
+                } * scale))
                 val replyOffset = if (step == StartupStep.Destiny || step == StartupStep.ConnectionTeaser) 5f else 0f
                 if (step == StartupStep.DeviceConnection) {
                     DeviceConnectionList(scale, onNext)
@@ -215,7 +239,6 @@ internal fun StartupPage(
                             imeAction = ImeAction.Done, onDone = dismissKeyboard)
                         BuddyButton("我们继续", scale, tag = "next", onClick = onNext)
                     } else if (step == StartupStep.FormalIntroduction) {
-                        Spacer(Modifier.height(49.dp * scale))
                         BuddyButton("嗯嗯好的", scale, tag = "next", onClick = onNext)
                     } else {
                         replies(step).forEachIndexed { index, reply ->
@@ -228,6 +251,7 @@ internal fun StartupPage(
             Spacer(Modifier.height(24.dp))
         }
     }
+    }
 }
 
 private fun story(step: StartupStep): String = when (step) {
@@ -235,8 +259,8 @@ private fun story(step: StartupStep): String = when (step) {
     StartupStep.Introduction -> "我平常生活在异星球\n最近\n逛地球的时候\n觉得你还挺有趣的"
     StartupStep.Destiny -> "更巧的是\n你还买了我们星球和安克\n秘密合作的通讯设备\n看来我们的缘分\n真的不简单"
     StartupStep.ConnectionTeaser -> "那让我们建立\n更加稳固的链接吧！"
-    StartupStep.Nickname -> "对了\n你叫什么？"
-    StartupStep.DeviceConnection -> "1、打开你的蓝牙\n2、选你的专属设备\n3、链接成功就好了"
+    StartupStep.Nickname -> "对了，我插一句\n你叫什么？"
+    StartupStep.DeviceConnection -> "正式创立连接吧~\n1、打开你的蓝牙\n2、选你的专属设备\n3、链接成功就好了"
     StartupStep.FormalIntroduction -> "OK你真棒\n你之后就通过它来找我吧\n正式自我介绍一下\n我叫LookBuddy\n我很会照顾打工人哦~"
     else -> ""
 }
@@ -259,15 +283,15 @@ private fun DeviceConnectionList(scale: Float, onConnect: () -> Unit) {
             Column {
                 Row(Modifier.fillMaxWidth().height(47.dp * scale).padding(end = 8.dp * scale),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Text("设备${if (index == 1) 2 else 1}：", color = BuddyInk, fontSize = (16f * scale).sp,
+                    Text("设备${if (index == 1) 2 else 1}：", color = BuddyInk, fontFamily = OnboardingDeviceFont, fontSize = (16f * scale).sp,
                         modifier = Modifier.width(73.dp * scale))
-                    Text("jcaohpuhhaffoe", color = BuddyInk, fontSize = (14f * scale).sp,
+                    Text("jcaohpuhhaffoe", color = BuddyInk, fontFamily = OnboardingDeviceFont, fontSize = (14f * scale).sp,
                         modifier = Modifier.weight(1f))
                     Box(Modifier.width(62.dp * scale).height(36.dp * scale)
                         .background(if (index == 1) Color(0xFFDFF9F2) else Color(0xFFF4F4F4), Pill)
                         .clip(Pill).clickable(role = Role.Button, onClick = onConnect)
                         .testTag("connect_$index"), contentAlignment = Alignment.Center) {
-                        Text(if (index == 1) "已连接" else "点击连接", color = BuddyInk, fontSize = (10f * scale).sp)
+                        Text(if (index == 1) "已连接" else "点击连接", color = BuddyInk, fontFamily = OnboardingDeviceFont, fontSize = (10f * scale).sp)
                     }
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF4F4F4)))
@@ -287,36 +311,57 @@ private fun StoryText(value: String, scale: Float, modifier: Modifier = Modifier
         }
     }
     Box(modifier.fillMaxWidth().padding(horizontal = 20.dp * scale), contentAlignment = Alignment.Center) {
-        Text(annotated, color = BuddyInk, fontSize = (28f * scale).sp,
+        Text(annotated, color = BuddyInk, fontSize = (36f * scale).sp,
             lineHeight = (39f * scale).sp, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
-private fun BuddyImage(scale: Float, modifier: Modifier = Modifier, horizontalOffset: Float = -6.5f) {
-    Image(painterResource(R.drawable.lookbuddy_character), "LookBuddy 戴着棕色帽子的小伙伴",
-        modifier.offset(x = (horizontalOffset * scale).dp).size(168.dp * scale, 186.dp * scale),
-        contentScale = ContentScale.Crop)
+private fun BuddyImage(scale: Float, step: StartupStep = StartupStep.Greeting, modifier: Modifier = Modifier) {
+    val width = when (step) {
+        StartupStep.Phone -> 281f
+        StartupStep.FormalIntroduction -> 500f
+        StartupStep.DeviceConnection -> 313f
+        StartupStep.Splash -> 332f
+        else -> 332.5f
+    }
+    val height = when (step) {
+        StartupStep.Phone -> 161f
+        StartupStep.FormalIntroduction -> 286f
+        StartupStep.DeviceConnection -> 179f
+        else -> 190f
+    }
+    Box(modifier.fillMaxWidth().height((if (step == StartupStep.DeviceConnection) 186f else height).dp * scale)) {
+        OnboardingArtwork(Modifier.align(Alignment.TopCenter)
+            .offset(x = (if (step == StartupStep.FormalIntroduction) -11.25f else 0f).dp * scale,
+                y = (if (step == StartupStep.DeviceConnection) -3f else 0f).dp * scale)
+            .requiredSize(width.dp * scale, height.dp * scale))
+    }
+}
+
+/** Single replacement point for future animated IP. The current asset is a static Figma original. */
+@Composable
+internal fun OnboardingArtwork(modifier: Modifier = Modifier) {
+    Image(painterResource(R.drawable.diary_buddy), "LookBuddy 戴着棕色帽子的小伙伴",
+        modifier, contentScale = ContentScale.Crop)
 }
 
 @Composable
 private fun SplashBuddy(scale: Float) {
     val entrance = remember { Animatable(0f) }
     LaunchedEffect(Unit) { entrance.animateTo(1f, tween(850)) }
-    val loop = rememberInfiniteTransition(label = "buddy floating")
-    val float by loop.animateFloat(0f, -6f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "float")
-    BuddyImage(scale, Modifier.graphicsLayer {
+    BuddyImage(scale, StartupStep.Splash, Modifier.graphicsLayer {
         alpha = entrance.value
         scaleX = 0.9f + 0.1f * entrance.value
         scaleY = scaleX
-        translationY = (float + 14f * (1f - entrance.value)) * scale * density
-    }, horizontalOffset = 0f)
+        translationY = 14f * (1f - entrance.value) * scale * density
+    })
 }
 
 @Composable
 private fun BuddyButton(
     label: String, scale: Float, modifier: Modifier = Modifier,
-    fontSize: Float = 22f, tag: String, onClick: () -> Unit
+    fontSize: Float = 32f, tag: String, onClick: () -> Unit
 ) {
     Box(modifier.then(if (modifier == Modifier) Modifier.fillMaxWidth() else Modifier)
         .height(49.dp * scale).shadow(4.dp, Pill).background(BuddyClay, Pill)
@@ -340,14 +385,14 @@ private fun BuddyInput(
                 drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.18f), Color.Transparent),
                     startY = 0f, endY = 10.dp.toPx()))
             }.testTag(tag).semantics { contentDescription = hint },
-        textStyle = TextStyle(color = BuddyInk, fontSize = (22f * scale).sp, textAlign = TextAlign.Center),
+        textStyle = TextStyle(color = BuddyInk, fontFamily = OnboardingHandwriting, fontSize = (32f * scale).sp, textAlign = TextAlign.Center),
         cursorBrush = SolidColor(BuddyClay),
         // Text keyboard intentionally permits letters, punctuation and arbitrary input for this prototype.
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = imeAction),
         keyboardActions = KeyboardActions(onDone = { onDone() }),
         decorationBox = { inner ->
             Box(Modifier.fillMaxSize().padding(horizontal = 15.dp * scale), contentAlignment = Alignment.Center) {
-                if (value.isEmpty()) Text(hint, color = BuddyHint, fontSize = (22f * scale).sp,
+                if (value.isEmpty()) Text(hint, color = BuddyHint, fontSize = (32f * scale).sp,
                     textAlign = TextAlign.Center)
                 inner()
             }
