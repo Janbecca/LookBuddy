@@ -1,6 +1,9 @@
 # Launch 联调部署
 
-构建上下文必须为仓库根目录，Dockerfile 选择 `deploy/launch/Dockerfile`。
+Launch 控制台使用 Coding 仓库部署时，选择 `main` 分支和“其他类型，自带 Dockerfile”；
+平台会从仓库根目录自动读取 `Dockerfile`，源端口填写 `8080`，监控检查接口填写 `/health/ready`。
+本地构建也必须使用仓库根目录作为构建上下文：`docker build -t lookbuddy .`。
+`deploy/launch/Dockerfile` 保留为同内容的部署参考副本。
 该镜像同时提供 Web 和 FastAPI，Android 使用相同 HTTPS origin。
 
 | 平台设置 | 值 |
