@@ -9,6 +9,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -70,33 +74,39 @@ internal fun CompanionPageLayout(
     }
 }
 
+/** Shared four-tab bar, matching the Figma diary screen. */
 @Composable
-internal fun CompanionNavigation(page: CompanionPage, s: Float, onPage: (CompanionPage) -> Unit) {
+internal fun CompanionNavigation(
+    page: CompanionPage,
+    s: Float,
+    onPage: (CompanionPage) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val nativeBottom = with(LocalDensity.current) { WindowInsets.navigationBars.getBottom(this).toDp() }
-    Row(Modifier.fillMaxWidth().background(CompanionPaper)
+    Row(modifier.fillMaxWidth().background(Color.White)
         .padding(bottom = maxOf(nativeBottom, 34.dp * s)).height(56.dp * s)
-        .padding(horizontal = 20.dp * s), horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically) {
-        listOf(CompanionPage.Home, CompanionPage.Diary, CompanionPage.Settings).forEach { destination ->
-            val active = page == destination || (page == CompanionPage.Camera && destination == CompanionPage.Home)
+        .padding(horizontal = 12.dp * s), verticalAlignment = Alignment.CenterVertically) {
+        listOf(CompanionPage.Home, CompanionPage.Camera, CompanionPage.Diary, CompanionPage.Settings).forEach { destination ->
+            val active = page == destination
             val label = when (destination) {
                 CompanionPage.Home -> "首页"
+                CompanionPage.Camera -> "陪伴视角"
                 CompanionPage.Diary -> "陪伴日记"
-                else -> "个人设置"
+                CompanionPage.Settings -> "个人设置"
             }
-            Box(Modifier.size(48.dp * s).clickable(role = Role.Tab) { onPage(destination) }
+            val icon = destination.name.lowercase()
+            val tint = if (active) CompanionClay else CompanionMuted
+            Box(Modifier.weight(1f).height(50.dp * s).clickable(role = Role.Tab) { onPage(destination) }
                 .semantics { contentDescription = label; selected = active }
-                .testTag("nav_${destination.name.lowercase()}"), contentAlignment = Alignment.Center) {
-                when {
-                    destination == CompanionPage.Home && active -> FigmaSvg("camera_nav_home", s, folder = "pages")
-                    destination == CompanionPage.Diary && active -> FigmaSvg("diary_nav_diary", s, folder = "pages")
-                    destination == CompanionPage.Settings && active -> FigmaSvg("settings_nav_settings", s, folder = "pages")
-                    destination == CompanionPage.Home -> FigmaSvg("inactive_nav_home", s, folder = "pages")
-                    else -> FigmaSvg(when (destination) {
-                        CompanionPage.Home -> "nav_home"
-                        CompanionPage.Diary -> "nav_statistics"
-                        else -> "nav_memories"
-                    }, s)
+                .testTag("nav_" + icon), contentAlignment = Alignment.Center) {
+                // Figma SVG dimensions preserve the exact icon geometry inside its 26dp slot.
+                Box(Modifier.size(26.dp * s), contentAlignment = Alignment.Center) {
+                    FigmaSvg(icon, s, Modifier.graphicsLayer {
+                        compositingStrategy = CompositingStrategy.Offscreen
+                    }.drawWithContent {
+                        drawContent()
+                        drawRect(tint, blendMode = BlendMode.SrcIn)
+                    }, folder = "navigation")
                 }
             }
         }

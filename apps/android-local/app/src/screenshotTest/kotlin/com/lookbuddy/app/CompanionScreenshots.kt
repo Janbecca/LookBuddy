@@ -38,7 +38,8 @@ fun CompactSettingsScreenshot() = PageScreenshot(CompanionPage.Settings)
 
 @Composable
 private fun PageScreenshot(page: CompanionPage) {
-    CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib) {
+    CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib,
+        LocalAppNow provides { LocalDateTime.of(2026, 10, 16, 12, 30) }) {
         CompanionPageLayout(page) { s ->
             when (page) {
                 CompanionPage.Diary -> DiaryScreen(s)

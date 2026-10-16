@@ -13,3 +13,4 @@
 
 - 日期/时间以 AppTime.kt 的统一设备本地时钟为准；固定时刻只允许用于预览和测试。工作时段通过 WorkScheduleStore 持久化，默认为每日09:00–18:00，支持跨夜，按结束时刻排除。18:00–06:00 独立使用夜间场景。
 - 夜间素材来自 Figma 229:8168；home_room_night.png 是原始背景，home_buddy_night.png 是设计素材的首帧静态 PNG，不能改扩展名冒充 PNG。幸运签周心情区域不得恢复固定高度，需覆盖小屏大字体验证。
+- 全 App 底部统一使用 CompanionNavigation 四入口：首页 / 陪伴视角 / 陪伴日记 / 个人设置。信号图标为摄像头页面，书本为 DiaryScreen；摄像头页独立选中 Camera。视觉以 Figma 303:4309 当前纯图标底栏为准，SVG 在 assets/navigation，禁止回退三 Tab 或将日记绑定信号图标。

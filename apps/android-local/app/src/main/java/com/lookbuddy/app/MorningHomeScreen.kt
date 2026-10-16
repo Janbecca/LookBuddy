@@ -205,18 +205,14 @@ internal fun MorningHomeContent(
         }
         StatisticsDrawer(expanded, drawerMotion, s, Modifier.align(Alignment.BottomCenter)
             .padding(bottom = navHeight + bottomInset).height(drawerHeight), now.toLocalDate()) { expanded = it }
-        Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.White)
-            .padding(bottom = bottomInset).height(navHeight).padding(horizontal = 28.dp * s),
-            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(42.dp * s).clickable(role = Role.Button) { }
-                .testTag("nav_home"), contentAlignment = Alignment.Center) { FigmaSvg("nav_home", s) }
-            Box(Modifier.size(48.dp * s).clickable(role = Role.Tab, onClick = onDiary)
-                .semantics { contentDescription = "陪伴日记" }
-                .testTag("nav_diary"), contentAlignment = Alignment.Center) { FigmaSvg("nav_statistics", s) }
-            Box(Modifier.size(48.dp * s).clickable(role = Role.Tab, onClick = onSettings)
-                .semantics { contentDescription = "个人设置" }
-                .testTag("nav_settings"), contentAlignment = Alignment.Center) { FigmaSvg("nav_memories", s) }
-        }
+        CompanionNavigation(CompanionPage.Home, s, onPage = { destination ->
+            when (destination) {
+                CompanionPage.Camera -> onCamera()
+                CompanionPage.Diary -> onDiary()
+                CompanionPage.Settings -> onSettings()
+                CompanionPage.Home -> Unit
+            }
+        }, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }
 
