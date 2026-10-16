@@ -85,13 +85,14 @@ router = APIRouter(prefix="/v1")
 
 
 def issue_tokens(db: Session, user: User) -> TokenPair:
+    from .accounts import username_for
     refresh = new_refresh_token()
     store_refresh_token(db, user.id, refresh)
     db.commit()
     return TokenPair(
         access_token=create_access_token(user.id),
         refresh_token=refresh,
-        user=UserPublic.model_validate(user),
+        user=UserPublic.model_validate(user).model_copy(update={"username": username_for(db, user.id)}),
     )
 
 
@@ -103,6 +104,8 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenPair:
     user = User(email=email, password_hash=hash_password(body.password), display_name=body.display_name, timezone=body.timezone)
     db.add(user)
     db.flush()
+    from .accounts import ensure_email_name
+    ensure_email_name(db, user)
     return issue_tokens(db, user)
 
 
@@ -111,6 +114,8 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenPair:
     user = db.scalar(select(User).where(User.email == body.email.lower()))
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Account unavailable")
     return issue_tokens(db, user)
 
 
@@ -135,8 +140,9 @@ def logout(body: LogoutRequest, db: Session = Depends(get_db)) -> None:
 
 
 @router.get("/me", response_model=UserPublic)
-def me(user: User = Depends(get_current_user)) -> User:
-    return user
+def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> UserPublic:
+    from .accounts import username_for
+    return UserPublic.model_validate(user).model_copy(update={"username": username_for(db, user.id)})
 
 
 @router.get("/preferences", response_model=PreferencesPublic)
@@ -718,7 +724,8 @@ async def realtime_stream(websocket: WebSocket, token: str | None = Query(defaul
             raise ValueError
         user_id = str(payload["sub"])
         with SessionLocal() as db:
-            if db.get(User, user_id) is None:
+            user = db.get(User, user_id)
+            if user is None or not user.is_active:
                 raise ValueError
     except (jwt.InvalidTokenError, ValueError):
         await websocket.close(code=4401)

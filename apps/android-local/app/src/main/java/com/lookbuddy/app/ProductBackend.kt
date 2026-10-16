@@ -75,10 +75,13 @@ internal class ProductClient(private val context: Context, private val scope: Co
     private val transport = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS)
         .followRedirects(false).followSslRedirects(false).build()
     private var generation = 0
-    private var session = vault.read()
+    private var session = vault.read()?.takeIf { value ->
+        value.optJSONObject("user")?.let { !it.isNull("username") && it.optString("username").isNotBlank() } == true
+    }
     val installation = prefs.getString("installation", null) ?: UUID.randomUUID().toString().also { prefs.edit().putString("installation", it).apply() }
     var endpoint by mutableStateOf(prefs.getString("endpoint", "http://10.0.2.2:8080")!!); private set
     var user by mutableStateOf(session?.optJSONObject("user")); private set
+    val username: String get() = if (user?.isNull("username") == false) user?.optString("username").orEmpty() else ""
     var summary by mutableStateOf(JSONObject()); private set
     var current by mutableStateOf<JSONObject?>(null); private set
     var error by mutableStateOf(""); private set
@@ -88,21 +91,11 @@ internal class ProductClient(private val context: Context, private val scope: Co
     var sdkStatus by mutableStateOf("官方设备未连接"); private set
     var connection by mutableStateOf("等待连接"); private set
     fun reportOffline() { connection = "离线，保留最近数据" }
-    private val legacyMoods = context.getSharedPreferences("lookbuddy_moods", Context.MODE_PRIVATE).all.toMap()
-    private val legacySchedule = WorkScheduleStore(context).read()
-    val hasLegacy = legacyMoods.isNotEmpty() || context.getSharedPreferences("lookbuddy_schedule", Context.MODE_PRIVATE).contains("start")
-    fun importOffered(): Boolean = prefs.getBoolean("import:${user?.optString("id")}", false)
-    fun skipImport() { prefs.edit().putBoolean("import:${user?.optString("id")}", true).apply() }
-    fun importLegacy() = action {
-        for ((day, mood) in legacyMoods) {
-            val date = runCatching { LocalDate.parse(day) }.getOrNull() ?: continue
-            val value = Mood.entries.firstOrNull { it.name == mood } ?: continue
-            // Never overwrite a cloud record during import.
-            if (request("/v1/moods/$date") == "null") check(saveMood(date, value))
-        }
-        request("/v1/work-schedule", "PATCH", JSONObject().put("start", legacySchedule.start.toString()).put("end", legacySchedule.end.toString()))
-        skipImport(); sync()
-    }
+    // Legacy local-history import stays unavailable for the new account system.
+    val hasLegacy = false
+    fun importOffered() = true
+    fun skipImport() = Unit
+    fun importLegacy() = Unit
     val gateway by lazy { com.lookbuddy.app.sdk.RealEufySdkGateway(context) }
 
     private fun clear() {
@@ -144,9 +137,14 @@ internal class ProductClient(private val context: Context, private val scope: Co
     }
     suspend fun login(phone: String, nickname: String, code: String = ""): Boolean {
         return try {
-            val result = JSONObject(request("/v1/auth/demo-phone", "POST", JSONObject().put("phone", phone.trim()).put("code", code).put("installationId", installation)
+            require(phone.trim().isNotEmpty()) { "请输入各端一致的用户名" }
+            generation++
+            val result = JSONObject(request("/v1/auth/username", "POST", JSONObject().put("username", phone.trim()).put("password", code)
                 .put("displayName", nickname.trim().ifEmpty { "体验用户" }), false))
-            vault.save(result); session = result; user = result.getJSONObject("user"); error = ""
+            marksMutex.withLock {
+                clear()
+                vault.save(result); session = result; user = result.getJSONObject("user"); error = ""
+            }
             sync(); true
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { error = e.message ?: "演示登录失败"; false }
@@ -256,7 +254,7 @@ internal fun ProductHost(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalProduct provides client, LocalAppNow provides clock) {
         Column(Modifier.fillMaxSize()) {
             TextButton(onClick = { address = client.endpoint; editServer = true }, modifier = Modifier.statusBarsPadding()) {
-                Text("演示手机号 · 未验证 · ${client.connection} · 后端设置", style = MaterialTheme.typography.labelSmall)
+                Text("演示用户名 · 未验证 · ${client.connection} · 后端设置", style = MaterialTheme.typography.labelSmall)
             }
             if (client.error.isNotBlank()) Text(client.error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 12.dp))
             Box(Modifier.weight(1f)) { content() }

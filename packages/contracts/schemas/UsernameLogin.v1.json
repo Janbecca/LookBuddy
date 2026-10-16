@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "username": {
+      "title": "Username",
+      "type": "string"
+    },
+    "password": {
+      "default": "",
+      "title": "Password",
+      "type": "string"
+    },
+    "displayName": {
+      "default": "体验用户",
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Displayname",
+      "type": "string"
+    }
+  },
+  "required": [
+    "username"
+  ],
+  "title": "UsernameLogin",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:UsernameLogin"
+}

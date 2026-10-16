@@ -192,6 +192,7 @@ class UserPublic(ApiModel):
     email: EmailStr
     display_name: str = Field(serialization_alias="displayName")
     timezone: str
+    username: str | None = None
 
 
 class RegisterRequest(ApiModel):

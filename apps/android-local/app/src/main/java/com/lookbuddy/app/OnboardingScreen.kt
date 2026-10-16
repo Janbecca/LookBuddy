@@ -206,7 +206,7 @@ internal fun StartupPage(
                 Spacer(Modifier.height(18.dp * scale))
                 Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp * scale),
                     verticalArrangement = Arrangement.spacedBy(21.dp * scale)) {
-                    BuddyInput(phone, onPhone, if (LocalProduct.current != null) "任意填写或留空" else "输入手机号", "phone", scale,
+                    BuddyInput(phone, onPhone, if (LocalProduct.current != null) "输入用户名" else "输入用户名", "phone", scale,
                         imeAction = ImeAction.Next)
                     Row(Modifier.fillMaxWidth().padding(start = 4.dp * scale),
                         horizontalArrangement = Arrangement.spacedBy(1.dp * scale)) {
@@ -217,7 +217,7 @@ internal fun StartupPage(
                     }
                     BuddyButton(if (LocalProduct.current != null) "演示登录" else "登陆", scale, Modifier.fillMaxWidth().offset(x = 4.dp * scale),
                         tag = "next", onClick = onNext)
-                    if (codeRequested) Text(if (LocalProduct.current != null) "演示模式：手机号和验证码任意填或留空" else "演示模式：任意验证码均可继续", color = BuddyClay,
+                    if (codeRequested) Text(if (LocalProduct.current != null) "演示模式：用户名和验证码任意填或留空" else "演示模式：任意验证码均可继续", color = BuddyClay,
                         fontSize = (13f * scale).sp, textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth().testTag("code_feedback"))
                 }

@@ -53,8 +53,8 @@ function AuthScreen() {
           <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>登录</button>
         </div>
         {mode === 'register' && <label>怎么称呼你<input value={name} onChange={(event) => setName(event.target.value)} /></label>}
-        <label>邮箱<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-        <label>密码<input type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+        <label>用户名<input type="text" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+        <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
         {error && <p className="error">{error}</p>}
         <button className="primary" disabled={busy}>{busy ? '请稍候…' : mode === 'register' ? '开始体验' : '回来啦'}</button>
       </form>

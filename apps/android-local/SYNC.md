@@ -1,5 +1,7 @@
 # LookBuddy 本地 App 同步
 
+1.4.0-unified（versionCode10，main）：产品请求层统一调用 `/v1/auth/username`；同名同账号，新用户名自动建号，密码输入不校验/不存储。不做历史合并或假数据授权。页面保持 b5204353aec01548fe2cd3b915170cd0c2eb8e11 的布局、样式和流程，只将手机号/邮箱改称用户名；Web 额外按用户确认取消邮箱格式和密码长度校验。队友分支已核对至 `5779b0055254bbcfa7dceb5a5f0cfc8eb3362e26`，不覆盖其分支。以下为历史版本记录，当前账号规则见 `../../docs/unified-accounts.md`。
+
 1.3.3-integration（versionCode9）：按用户要求放宽演示登录，手机号/验证码任意输入或留空均可；只在显式开启的 development/competition 生效，production 仍禁用。保留安装级隔离与旧演示账号，验证码不保存。同步目标为 main 和整合分支，不覆盖队友同步分支。
 
 整合版补充：前后端接入工作先在独立 `codex/android-backend-integration` 分支完成，随后按用户授权整合至 `main`，已合入队友 `4b8bd07ff31220f9ad2f8de83409801ac99233c8`，不覆盖本同步分支。详见 `../../docs/android-integration.md`。整合版版本为1.3.2-integration，产品源码不变换目录，增加 SDK36/JDK17 构建入口；手机号仅为明确标注的演示登录，Mark 本轮不录视频。

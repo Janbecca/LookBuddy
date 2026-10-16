@@ -10,12 +10,14 @@ from .models import SchemaRevision
 
 
 REVISION = "20261008_p0_learning_foundation"
-REVISIONS = (REVISION, "20261008_p2_scheduler", "20261008_p3_expression", "20261016_product_pages")
+REVISIONS = (REVISION, "20261008_p2_scheduler", "20261008_p3_expression", "20261016_product_pages", "20261016_unified_usernames")
 
 
 def migrate(bind: Engine) -> None:
     Base.metadata.create_all(bind=bind)
     with Session(bind) as db:
+        from .accounts import backfill_email_names
+        backfill_email_names(db)
         for revision in REVISIONS:
             if db.get(SchemaRevision, revision) is None:
                 db.add(SchemaRevision(version=revision))

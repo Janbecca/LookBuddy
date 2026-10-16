@@ -14,6 +14,11 @@ interface AuthState {
 function restore(): Pick<AuthState, 'accessToken' | 'refreshToken' | 'user'> {
   try {
     const value = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+    // Legacy installation/email sessions must log into the unified identity;
+    // do not carry their history into a different username.
+    if (typeof value.user?.username !== 'string' || !value.user.username.trim()) {
+      return { accessToken: null, refreshToken: null, user: null };
+    }
     return { accessToken: value.accessToken ?? null, refreshToken: value.refreshToken ?? null, user: value.user ?? null };
   } catch {
     return { accessToken: null, refreshToken: null, user: null };

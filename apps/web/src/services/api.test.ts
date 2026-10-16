@@ -47,6 +47,18 @@ describe('long-running camera session authentication', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('logs into the chosen username without renewing or migrating the old session', async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ accessToken: 'chosen', refreshToken: 'chosen-refresh', user: { id: 'target', username: 'shared' } })));
+    vi.stubGlobal('fetch', fetch);
+    const { api } = await import('./api');
+    const result = await api.register('shared', 'x', 'old');
+    expect(result.user.id).toBe('target');
+    await api.login('shared', '');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenNthCalledWith(1, '/v1/auth/username', expect.objectContaining({ method: 'POST', body: JSON.stringify({ username: 'shared', password: 'x', displayName: 'old' }) }));
+    expect(fetch).toHaveBeenNthCalledWith(2, '/v1/auth/username', expect.objectContaining({ method: 'POST', body: JSON.stringify({ username: 'shared', password: '' }) }));
+  });
+
   it('keeps the session on temporary refresh connection failure', async () => {
     vi.stubGlobal('fetch', vi.fn(async (path: string) => {
       if (path === '/v1/auth/refresh') throw new Error('network offline');

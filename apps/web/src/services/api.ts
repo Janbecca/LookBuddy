@@ -65,9 +65,9 @@ export const api = {
     return request<unknown>(path, { method, body: method === 'GET' || body === undefined ? undefined : JSON.stringify(body) });
   },
   register: (email: string, password: string, displayName: string) =>
-    request<TokenPair>('/v1/auth/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) }),
+    request<TokenPair>('/v1/auth/username', { method: 'POST', body: JSON.stringify({ username: email, password, displayName }) }),
   login: (email: string, password: string) =>
-    request<TokenPair>('/v1/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    request<TokenPair>('/v1/auth/username', { method: 'POST', body: JSON.stringify({ username: email, password }) }),
   createDevice: (name = 'Web 感知端') =>
     request<{ id: string }>('/v1/devices', { method: 'POST', body: JSON.stringify({ name, platform: 'web' }) }),
   createSession: (deviceId: string) =>

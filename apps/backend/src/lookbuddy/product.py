@@ -1,4 +1,4 @@
-"""Product-page APIs. Demo identity is device scoped and never verifies a phone."""
+"""Product APIs; legacy device identities remain compatible with username login."""
 from datetime import date, datetime, time, timedelta, timezone
 import hashlib
 import re
@@ -137,14 +137,21 @@ def demo_phone(body: DemoPhoneIn, db: Session = Depends(get_db)):
         db.add(DemoIdentity(identity_key=identity, user_id=user.id, phone_hint=hint))
     else:
         user = db.get(User, row.user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(401, "Account unavailable")
     return issue_tokens(db, user)
 
 
 def profile_json(db, user):
+    from .accounts import username_for
     identity = db.scalar(select(DemoIdentity).where(DemoIdentity.user_id == user.id))
+    username = username_for(db, user.id)
+    settings = get_settings()
+    demo = identity is not None or (username is not None and settings.demo_login_enabled
+                                   and settings.env in {"development", "competition"})
     return {"id": user.id, "displayName": user.display_name, "timezone": user.timezone,
-            "demo": identity is not None, "phoneMasked": identity.phone_hint if identity else None,
-            "email": None if identity else user.email}
+            "demo": demo, "phoneMasked": identity.phone_hint if identity else None,
+            "email": None if identity else user.email, "username": username}
 
 
 @router.get("/profile")

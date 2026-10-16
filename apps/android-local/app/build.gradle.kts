@@ -17,8 +17,8 @@ android {
         applicationId = "com.lookbuddy.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 9
-        versionName = "1.3.3-integration"
+        versionCode = 10
+        versionName = "1.4.0-unified"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
