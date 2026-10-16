@@ -1,8 +1,24 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     id("com.android.compose.screenshot") version "0.0.1-alpha16"
 }
+
+val lookBuddyLocalProperties = Properties().apply {
+    val propertiesFile = rootProject.file("local.properties")
+    if (propertiesFile.exists()) propertiesFile.inputStream().use(::load)
+}
+
+fun buildConfigString(value: String): String =
+    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val desktopPetUrl = lookBuddyLocalProperties.getProperty(
+    "lookbuddy.desktop.url",
+    "http://10.0.2.2:5211"
+)
+val desktopPetToken = lookBuddyLocalProperties.getProperty("lookbuddy.desktop.token", "")
 
 android {
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
@@ -15,10 +31,12 @@ android {
         applicationId = "com.lookbuddy.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 8
-        versionName = "1.4.0"
+        versionCode = 9
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "LOOKBUDDY_DESKTOP_URL", buildConfigString(desktopPetUrl))
+        buildConfigField("String", "LOOKBUDDY_DESKTOP_TOKEN", buildConfigString(desktopPetToken))
     }
 
     buildTypes {
@@ -34,6 +52,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true

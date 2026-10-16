@@ -1,5 +1,7 @@
 package com.lookbuddy.app
 
+import kotlinx.coroutines.launch
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,30 +30,38 @@ internal val CompanionMuted = Color(0xFF918270)
 internal val CompanionBorder = Color(0xFFE8DCCB)
 internal val CompanionClay = Color(0xFFA86843)
 
-internal enum class CompanionPage { Home, Diary, Settings, Camera }
+internal enum class CompanionPage { Home, Diary, Settings }
 
-/** One injectable camera boundary; page code never depends on a camera vendor or transport. */
+/** Reminder transport is injectable; preview events share the same state above all tabs. */
 @Composable
 internal fun LookBuddyApp(
     initialPage: CompanionPage = CompanionPage.Home,
-    cameraFeed: CameraFeed? = null
+    reminderSource: HomeReminderSource? = null
 ) {
     var page by rememberSaveable { mutableStateOf(initialPage) }
-    val defaultCamera = remember { UnconnectedCameraFeed() }
-    val camera = cameraFeed ?: defaultCamera
+    val reminders = rememberHomeReminderController()
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(reminderSource, owner) {
+        owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            reminderSource?.reminders?.collect { reminders.receive(it) }
+        }
+    }
+    val acknowledge: (String) -> Unit = { id ->
+        scope.launch { runCatching { reminderSource?.acknowledge(id) } }
+    }
     val savedPages = rememberSaveableStateHolder()
     val workPlayback = rememberWorkBuddyPlayback()
     BackHandler(page != CompanionPage.Home) { page = CompanionPage.Home }
     CompositionLocalProvider(LocalWorkPlayback provides workPlayback) {
     savedPages.SaveableStateProvider(page.name) {
         when (page) {
-            CompanionPage.Home -> MorningHomeScreen(onCamera = { page = CompanionPage.Camera },
+            CompanionPage.Home -> MorningHomeScreen(reminders = reminders, onReminderAcknowledged = acknowledge,
                 onDiary = { page = CompanionPage.Diary }, onSettings = { page = CompanionPage.Settings })
             else -> CompanionPageLayout(page, onPage = { page = it }) { s ->
                 when (page) {
                     CompanionPage.Diary -> DiaryScreen(s)
-                    CompanionPage.Camera -> CameraScreen(camera, s)
-                    CompanionPage.Settings -> PersonalSettingsScreen(s, onCamera = { page = CompanionPage.Camera })
+                    CompanionPage.Settings -> PersonalSettingsScreen(s)
                     else -> Unit
                 }
             }
@@ -77,7 +87,7 @@ internal fun CompanionPageLayout(
     }
 }
 
-/** Shared four-tab bar, matching the Figma diary screen. */
+/** Three destinations: Home, Diary, Settings. Camera page was removed in 1.5. */
 @Composable
 internal fun CompanionNavigation(
     page: CompanionPage,
@@ -89,11 +99,10 @@ internal fun CompanionNavigation(
     Row(modifier.fillMaxWidth().background(Color.White)
         .padding(bottom = maxOf(nativeBottom, 34.dp * s)).height(56.dp * s)
         .padding(horizontal = 12.dp * s), verticalAlignment = Alignment.CenterVertically) {
-        listOf(CompanionPage.Home, CompanionPage.Camera, CompanionPage.Diary, CompanionPage.Settings).forEach { destination ->
+        listOf(CompanionPage.Home, CompanionPage.Diary, CompanionPage.Settings).forEach { destination ->
             val active = page == destination
             val label = when (destination) {
                 CompanionPage.Home -> "首页"
-                CompanionPage.Camera -> "陪伴视角"
                 CompanionPage.Diary -> "陪伴日记"
                 CompanionPage.Settings -> "个人设置"
             }

@@ -81,10 +81,11 @@ internal fun MorningHomeScreen(
     initialCalendarOpen: Boolean = false,
     previewDate: LocalDate? = null,
     previewRecords: Map<LocalDate, Mood>? = null,
-    onCamera: () -> Unit = {},
     onDiary: () -> Unit = {},
     onSettings: () -> Unit = {},
-    previewTime: java.time.LocalDateTime? = null
+    previewTime: java.time.LocalDateTime? = null,
+    reminders: HomeReminderController = rememberHomeReminderController(),
+    onReminderAcknowledged: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val store = remember(context) { MoodStore(context) }
@@ -96,7 +97,8 @@ internal fun MorningHomeScreen(
         Box(Modifier.fillMaxSize().then(if (open) Modifier.blur(2.dp).clearAndSetSemantics {} else Modifier)) {
             // previewDate 非空时为测试 / 预览模式，跳过 GLM 气泡请求避免网络干扰
             MorningHomeContent(initialExpanded, greetingScene = if (previewDate != null) null else "morning_seated",
-                onCamera = onCamera, onDiary = onDiary, onSettings = onSettings, onCalendar = {
+                reminders = reminders, onReminderAcknowledged = onReminderAcknowledged,
+                onDiary = onDiary, onSettings = onSettings, onCalendar = {
                 records = previewRecords ?: store.week(date)
                 open = true
             }, now = now)

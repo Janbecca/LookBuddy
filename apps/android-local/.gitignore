@@ -19,6 +19,7 @@ local.properties
 /backend/__pycache__/
 /backend/*.pyc
 
-# 原始字体压缩包留在本机，实际使用的字体在 res/font 中同步
-/字体.rar
+/桌面宠物/LookBuddy_Desktop/node_modules/
+/桌面宠物/LookBuddy_Desktop/dist/
+/桌面宠物/LookBuddy_Desktop/artifacts/
 

@@ -37,16 +37,8 @@ class CompanionPagesTest {
         compose.onNodeWithTag("expanded_stats").assertExists()
         compose.onNodeWithTag("nav_settings").performClick()
         compose.onNodeWithTag("settings_settings_device").performClick()
-        compose.onNodeWithText("查看陪伴视角").performClick()
-        compose.onNodeWithTag("camera_screen").assertExists()
-    }
-
-    @Test fun homeCameraOpensAndDisconnectedMarkNeverSaves() {
-        compose.setContent { LookBuddyApp() }
-        compose.onNodeWithTag("nav_camera").performClick()
-        compose.onNodeWithTag("mark_moment").performScrollTo().performClick()
-        compose.onNodeWithTag("camera_feedback").performScrollTo().assertTextEquals("请先连接摄像头，并等待视频缓冲就绪。")
-        compose.onAllNodesWithText("待识别").assertCountEquals(2)
+        compose.onNodeWithText("知道啦").performClick()
+        compose.onNodeWithTag("settings_screen").assertExists()
     }
 
     @Test fun diaryScrollsToLastEntryAndOpensHonestPreview() {
@@ -81,41 +73,4 @@ class CompanionPagesTest {
         compose.onNodeWithText("取消").performClick()
     }
 
-    @Test fun cameraAdapterGetsPreAndPostRollAndStopsWhenLeaving() {
-        val feed = TestCameraFeed()
-        compose.setContent { LookBuddyApp(CompanionPage.Camera, feed) }
-        compose.onNodeWithText("测试实时画面").assertIsDisplayed()
-        compose.onNodeWithTag("mark_moment").performScrollTo().performClick()
-        compose.onNodeWithText("这一刻已保存到本机。").performScrollTo().assertIsDisplayed()
-        assertEquals(MomentRequest(5, 5), feed.request)
-        assertTrue(feed.starts > 0)
-        compose.onNodeWithTag("nav_settings").performClick()
-        compose.runOnIdle { assertTrue(feed.stops > 0) }
-    }
-
-    @Test fun cameraFailureIsReportedAndCanRetry() {
-        val feed = TestCameraFeed().apply { fail = true }
-        compose.setContent { LookBuddyApp(CompanionPage.Camera, feed) }
-        compose.onNodeWithTag("mark_moment").performScrollTo().performClick()
-        compose.onNodeWithText("保存失败，请稍后重试。").performScrollTo().assertIsDisplayed()
-        compose.runOnIdle { feed.fail = false }
-        compose.onNodeWithTag("mark_moment").performScrollTo().performClick()
-        compose.onNodeWithText("这一刻已保存到本机。").performScrollTo().assertIsDisplayed()
-    }
-}
-
-private class TestCameraFeed : CameraFeed {
-    override val state = MutableStateFlow(CameraFeedState(CameraConnection.Live, posture = "坐姿-端正", activity = "专注", canMark = true))
-    var request: MomentRequest? = null
-    var starts = 0
-    var stops = 0
-    var fail = false
-    override fun start() { starts++ }
-    override fun stop() { stops++ }
-    @Composable override fun Preview(modifier: Modifier) { Text("测试实时画面", modifier = modifier) }
-    override suspend fun markMoment(request: MomentRequest): MomentResult {
-        this.request = request
-        if (fail) error("Camera disconnected")
-        return MomentResult.Saved(Uri.parse("content://test/moment.mp4"))
-    }
 }

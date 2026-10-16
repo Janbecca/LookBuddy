@@ -61,12 +61,12 @@ fun DeviceConnectionScreenshot() = StartupPage(StartupStep.DeviceConnection)
 fun FormalIntroductionScreenshot() = StartupPage(StartupStep.FormalIntroduction)
 
 @PreviewTest
-@Preview(widthDp = 393, heightDp = 852, showSystemUi = true)
+@Preview(widthDp = 393, heightDp = 852, showSystemUi = true, device="spec:width=393dp,height=852dp,dpi=160")
 @Composable
 fun MorningHomeScreenshot() = ScreenshotHome(false)
 
 @PreviewTest
-@Preview(widthDp = 393, heightDp = 852, showSystemUi = true)
+@Preview(widthDp = 393, heightDp = 852, showSystemUi = true, device="spec:width=393dp,height=852dp,dpi=160")
 @Composable
 fun ExpandedStatisticsScreenshot() = ScreenshotHome(true)
 
@@ -98,7 +98,7 @@ private fun calendarPreviewRecords() = listOf(Mood.Happy, Mood.Calm, Mood.Sad, M
     .mapIndexed { index, mood -> calendarPreviewDate.minusDays(6L - index) to mood }.toMap()
 
 @PreviewTest
-@Preview(widthDp = 393, heightDp = 852, showSystemUi = true)
+@Preview(widthDp = 393, heightDp = 852, showSystemUi = true, device="spec:width=393dp,height=852dp,dpi=160")
 @Composable
 fun MoodSelectionScreenshot() {
     CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib) {
@@ -108,7 +108,7 @@ fun MoodSelectionScreenshot() {
 }
 
 @PreviewTest
-@Preview(widthDp = 393, heightDp = 852, showSystemUi = true)
+@Preview(widthDp = 393, heightDp = 852, showSystemUi = true, device="spec:width=393dp,height=852dp,dpi=160")
 @Composable
 fun MoodFortuneScreenshot() {
     CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib) {
@@ -118,7 +118,7 @@ fun MoodFortuneScreenshot() {
 }
 
 @PreviewTest
-@Preview(widthDp = 320, heightDp = 640, fontScale = 1.3f, showSystemUi = true)
+@Preview(widthDp = 320, heightDp = 640, fontScale = 1.3f, showSystemUi = true, device="spec:width=320dp,height=640dp,dpi=160")
 @Composable
 fun CompactMoodSelectionScreenshot() {
     CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib) {
@@ -128,7 +128,7 @@ fun CompactMoodSelectionScreenshot() {
 }
 
 @PreviewTest
-@Preview(widthDp = 393, heightDp = 852, showSystemUi = true)
+@Preview(widthDp = 393, heightDp = 852, showSystemUi = true, device="spec:width=393dp,height=852dp,dpi=160")
 @Composable
 fun EveningHomeScreenshot() {
     CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib) {
@@ -138,7 +138,7 @@ fun EveningHomeScreenshot() {
 }
 
 @PreviewTest
-@Preview(widthDp = 320, heightDp = 640, fontScale = 1.5f, showSystemUi = true)
+@Preview(widthDp = 320, heightDp = 640, fontScale = 1.5f, showSystemUi = true, device="spec:width=320dp,height=640dp,dpi=160")
 @Composable
 fun CompactMoodFortuneScreenshot() {
     CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib) {

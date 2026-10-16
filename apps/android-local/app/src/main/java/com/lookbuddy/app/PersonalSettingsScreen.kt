@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
+internal fun PersonalSettingsScreen(s: Float) {
     val context = LocalContext.current
     val preferences = remember(context) { context.getSharedPreferences("lookbuddy_onboarding", Context.MODE_PRIVATE) }
     var nickname by remember { mutableStateOf(preferences.getString("nickname", "") ?: "") }
@@ -145,7 +145,7 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
                 when (selected) {
                     "账号安全" -> Text("当前为本地体验，尚未接入真实账号登录。昵称和心情记录保存在这台设备上。", color = CompanionMuted)
                     "系统设置" -> Text("可在 Android 应用设置中管理 LookBuddy 的权限、通知和存储。", color = CompanionMuted)
-                    "设备连接" -> Text("在陪伴视角查看摄像头连接状态、原视频和记录高光时刻。", color = CompanionMuted)
+                    "设备连接" -> Text("设备连接将在接入实际设备后开放。目前可以正常使用首页陪伴与日记。", color = CompanionMuted)
                 }
                 if (selected == "系统设置") {
                     Text("工作时间（每日）", color = CompanionInk)
@@ -169,14 +169,14 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
             confirmButton = {
                 TextButton(enabled = !saving, onClick = {
                     when (selected) {
-                        "设备连接" -> { dialog = null; onCamera() }
+                        "设备连接" -> { dialog = null }
                         "系统设置" -> runCatching {
                             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
                         }.onSuccess { dialog = null }.onFailure { error = "无法打开系统设置。" }.let { }
                         else -> dialog = null
                     }
                 }) { Text(when (selected) {
-                    "设备连接" -> "查看陪伴视角"
+                    "设备连接" -> "知道啦"
                     "系统设置" -> "打开应用设置"
                     else -> "知道啦"
                 }, color = CompanionClay) }

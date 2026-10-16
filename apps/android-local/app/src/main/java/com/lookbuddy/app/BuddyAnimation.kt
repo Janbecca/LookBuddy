@@ -24,7 +24,9 @@ import kotlinx.coroutines.withContext
 
 internal enum class BuddyClip(val raw: Int, val first: Int, val last: Int) {
     Introduction(R.raw.buddy_intro, R.drawable.buddy_intro_first, R.drawable.buddy_intro_last),
-    Work(R.raw.buddy_work, R.drawable.buddy_work_first, R.drawable.buddy_work_last)
+    Work(R.raw.buddy_work, R.drawable.buddy_work_first, R.drawable.buddy_work_last),
+    Drink(R.raw.buddy_drink, R.drawable.buddy_drink_first, R.drawable.buddy_drink_last),
+    Fatigue(R.raw.buddy_fatigue, R.drawable.buddy_fatigue_first, R.drawable.buddy_fatigue_last)
 }
 internal const val WorkReplayIntervalMs = 60L * 60L * 1000L
 internal val LocalWorkReplayInterval = staticCompositionLocalOf { WorkReplayIntervalMs }
@@ -67,15 +69,16 @@ internal fun BuddyWebpOnce(
     description: String = "LookBuddy",
     run: Long = 0L,
     completed: Boolean = false,
-    onFinished: () -> Unit = {}
+    onFinished: () -> Unit = {},
+    contentScale: ContentScale = ContentScale.Crop
 ) {
     if (LocalInspectionMode.current || !LocalBuddyMotionEnabled.current || Build.VERSION.SDK_INT < 28) {
-        Image(painterResource(clip.last), description, modifier, contentScale = ContentScale.Crop)
+        Image(painterResource(clip.last), description, modifier, contentScale = contentScale)
         return
     }
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
-    val view = remember { ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP } }
+    val view = remember { ImageView(context).apply { scaleType = if (contentScale == ContentScale.Fit) ImageView.ScaleType.FIT_CENTER else ImageView.ScaleType.CENTER_CROP } }
     var finished by remember(clip, run) { mutableStateOf(completed) }
     var drawable by remember(clip, run) { mutableStateOf<Drawable?>(null) }
     val finishCallback by rememberUpdatedState(onFinished)

@@ -106,15 +106,16 @@ internal fun MorningHomeContent(
     initialExpanded: Boolean = false,
     onCalendar: () -> Unit = {},
     greetingScene: String? = "morning_seated",
-    onCamera: () -> Unit = {},
     onDiary: () -> Unit = {},
     onSettings: () -> Unit = {},
     now: java.time.LocalDateTime = rememberAppTime(),
-    schedule: WorkSchedule = rememberWorkSchedule()
+    schedule: WorkSchedule = rememberWorkSchedule(),
+    reminders: HomeReminderController = rememberHomeReminderController(),
+    onReminderAcknowledged: (String) -> Unit = {}
 ) {
     var expanded by rememberSaveable { mutableStateOf(initialExpanded) }
     val workPlayback = LocalWorkPlayback.current ?: rememberWorkBuddyPlayback()
-    val run = workPlayback.generation
+    var previewOpen by rememberSaveable { mutableStateOf(false) }
     val status = schedule.status(now)
     val night = isNightTime(now.toLocalTime())
     val working = status.working
@@ -138,6 +139,14 @@ internal fun MorningHomeContent(
             FigmaSvg("top_curve", s, Modifier.offset(x = (310.55f * s).dp, y = (-417.4f * s).dp)
                 .graphicsLayer { alpha = 1f - drawerProgress })
         }
+        // Overlay scene is independent from header/drawer; shrink uniformly only when height is constrained.
+        val drawerTop = maxHeight.value - navHeight.value - bottomInset.value - 183f * s
+        val sceneScale = minOf(s, ((drawerTop - 184f * s) / 330f).coerceAtLeast(.35f))
+        Box(Modifier.fillMaxSize().offset(x = ((maxWidth.value - 393f * sceneScale) / 2f).dp,
+            y = (184f * (s - sceneScale)).dp)) {
+            HomeBuddyArtwork(reminders, workPlayback, night, sceneScale, sceneScale)
+            HomeReminderBubble(reminders, drawerProgress > .001f, sceneScale, sceneScale, onReminderAcknowledged)
+        }
         Column(Modifier.fillMaxWidth().statusBarsPadding()) {
             Spacer(Modifier.height((62f * s - topInset).coerceAtLeast(0f).dp))
             Row(Modifier.fillMaxWidth().height(51.dp * s).padding(horizontal = 16.dp * s),
@@ -145,7 +154,10 @@ internal fun MorningHomeContent(
                 Text("LOOKBuddy", color = Color.Black, fontSize = (24 * s).sp, modifier = Modifier.weight(1f))
                 Row(Modifier.offset(y = 8.dp * s), horizontalArrangement = Arrangement.spacedBy(8.dp * s)) {
                     HeaderIcon("calendar_circle", "calendar", s, "心情日历", onCalendar)
-                    HeaderIcon("camera_circle", "camera", s, "陪伴视角", onCamera)
+                    Text("预览", color = HomeInk, fontSize = (12 * s).sp,
+                        modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(20.dp))
+                            .background(Color.White.copy(alpha = .48f)).clickable(role = Role.Button) { previewOpen = true }
+                            .padding(horizontal = 12.dp * s, vertical = 12.dp * s).testTag("home_state_preview"))
                 }
             }
             Row(Modifier.align(Alignment.CenterHorizontally).width(200.dp * s).height(38.dp * s)
@@ -172,35 +184,16 @@ internal fun MorningHomeContent(
                 }
                 WorkTime("距下班时间", displayDuration(status.remainingMinutes), s)
             }
-            Spacer(Modifier.height((if (night) 31 else 19).dp * s))
-            Box(Modifier.fillMaxWidth().height((if (night) 343 else 277).dp * s).clipToBounds()) {
-                if (night) Image(painterResource(R.drawable.home_buddy_night), "LookBuddy 回家休息",
-                    Modifier.align(Alignment.TopStart).wrapContentSize(Alignment.TopStart, unbounded = true).requiredSize(514.dp * s, 369.dp * s)
-                        .offset(x = (-58).dp * s, y = (-38).dp * s), contentScale = ContentScale.Fit)
-                else BuddyWebpOnce(BuddyClip.Work, description = "LookBuddy 在电脑前办公",
-                    modifier = Modifier.align(Alignment.TopCenter).offset(x = (-6).dp * s)
-                        .requiredSize(353.dp * s, 290.dp * s),
-                    run = run, completed = workPlayback.completed,
-                    onFinished = { workPlayback.finish(run) })
-                // GLM 关心语气泡：在 Buddy IP 旁展示，不阻塞首页加载。
-                // greetingScene 为 null 时跳过（测试 / 预览模式），避免发网络请求。
-                if (greetingScene != null) {
-                    val greeting = rememberBuddyGreeting(scene = greetingScene)
-                    val g by greeting.collectAsState()
-                    if (g.show && g.message.isNotBlank()) {
-                        BuddySpeechBubble(
-                            message = g.message,
-                            s = s,
-                            modifier = Modifier.align(Alignment.TopStart)
-                                .offset(x = 22.dp * s, y = 10.dp * s)
-                                .testTag("buddy_greeting_bubble")
-                                .semantics { contentDescription = "Buddy 关心语" }
-                        )
-                    }
-                }
-            }
         }
-        if (drawerProgress < 1f) {
+        // Keep the user's existing optional desktop bridge; its greeting never adds a second home bubble.
+        if (greetingScene != null) {
+            val greeting by rememberBuddyGreeting(scene = greetingScene).collectAsState()
+            DesktopPetSyncEffect(scene = greetingScene, working = working,
+                message = greeting.message.takeIf { greeting.show && it.isNotBlank() })
+        }
+
+        val quoteHasRoom = reminders.active == null || (density.fontScale <= 1.1f && maxHeight.value >= 760f * s)
+        if (drawerProgress < 1f && quoteHasRoom) {
             Text("一起陪伴的第${companionDays}天，也要照顾好自己~", color = HomeInk, fontSize = (16 * s).sp,
                 letterSpacing = (2.2f * s).sp, lineHeight = (30 * s).sp, textAlign = TextAlign.Center,
                 modifier = Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = 1f - drawerProgress }
@@ -211,13 +204,15 @@ internal fun MorningHomeContent(
             .padding(bottom = navHeight + bottomInset).height(drawerHeight), now.toLocalDate()) { expanded = it }
         CompanionNavigation(CompanionPage.Home, s, onPage = { destination ->
             when (destination) {
-                CompanionPage.Camera -> onCamera()
                 CompanionPage.Diary -> onDiary()
                 CompanionPage.Settings -> onSettings()
                 CompanionPage.Home -> Unit
             }
         }, modifier = Modifier.align(Alignment.BottomCenter))
     }
+    if (previewOpen) ReminderPreviewDialog(reminders, onClose = { previewOpen = false }, onNormal = {
+        reminders.acknowledge()?.let(onReminderAcknowledged)
+    })
 }
 
 @Composable
@@ -428,53 +423,6 @@ private fun SupplementaryStatistics(s: Float) {
  * 半透明白底圆角气泡，带小尾巴指向角色。文案为模型生成或兜底文案。
  * 不使用 emoji 或 Markdown，与首页风格一致。
  */
-@Composable
-private fun BuddySpeechBubble(
-    message: String,
-    s: Float,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier
-            .width(220.dp * s)
-            .clipToBounds()
-            .semantics { contentDescription = message }
-            .testTag("buddy_greeting_bubble")
-    ) {
-        // 气泡主体（半透明白底，带圆角和阴影感）
-        Column(
-            Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp * s))
-                .background(Color.White.copy(alpha = 0.92f))
-                .padding(horizontal = 14.dp * s, vertical = 10.dp * s)
-        ) {
-            Text(
-                message,
-                color = HomeInk,
-                fontSize = (13 * s).sp,
-                lineHeight = (19 * s).sp,
-                textAlign = TextAlign.Start
-            )
-        }
-        // 气泡小尾巴（指向 Buddy 角色）
-        Canvas(
-            Modifier.size(12.dp * s, 8.dp * s)
-                .align(Alignment.BottomStart)
-                .offset(x = 28.dp * s, y = (-1).dp * s)
-        ) {
-            val w = size.width
-            val h = size.height
-            val path = Path().apply {
-                moveTo(0f, 0f)
-                lineTo(w, 0f)
-                lineTo(w * 0.2f, h)
-                close()
-            }
-            drawPath(path, Color.White.copy(alpha = 0.92f))
-        }
-    }
-}
-
 /** Parse the original SVG asset, keeping its authored root dimensions and paths unchanged. */
 @Composable
 internal fun FigmaSvg(name: String, s: Float, modifier: Modifier = Modifier, folder: String = "home") {

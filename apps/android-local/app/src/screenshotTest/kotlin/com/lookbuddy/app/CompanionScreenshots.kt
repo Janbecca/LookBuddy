@@ -17,19 +17,9 @@ fun DiaryScreenshot() = PageScreenshot(CompanionPage.Diary)
 fun PersonalSettingsScreenshot() = PageScreenshot(CompanionPage.Settings)
 
 @PreviewTest
-@Preview(widthDp = 393, heightDp = 852, showSystemUi = true)
-@Composable
-fun CameraDisconnectedScreenshot() = PageScreenshot(CompanionPage.Camera)
-
-@PreviewTest
 @Preview(widthDp = 320, heightDp = 640, fontScale = 1.3f, showSystemUi = true)
 @Composable
 fun CompactDiaryScreenshot() = PageScreenshot(CompanionPage.Diary)
-
-@PreviewTest
-@Preview(widthDp = 320, heightDp = 640, fontScale = 1.3f, showSystemUi = true)
-@Composable
-fun CompactCameraScreenshot() = PageScreenshot(CompanionPage.Camera)
 
 @PreviewTest
 @Preview(widthDp = 320, heightDp = 640, fontScale = 1.3f, showSystemUi = true)
@@ -43,8 +33,8 @@ private fun PageScreenshot(page: CompanionPage) {
         CompanionPageLayout(page) { s ->
             when (page) {
                 CompanionPage.Diary -> DiaryScreen(s)
-                CompanionPage.Settings -> PersonalSettingsScreen(s, onCamera = {})
-                else -> CameraScreen(UnconnectedCameraFeed(), s, LocalDateTime.of(2026, 10, 13, 12, 30))
+                CompanionPage.Settings -> PersonalSettingsScreen(s)
+                else -> Unit
             }
         }
     }

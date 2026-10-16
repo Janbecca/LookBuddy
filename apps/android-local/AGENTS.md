@@ -13,5 +13,7 @@
 
 - 日期/时间以 AppTime.kt 的统一设备本地时钟为准；固定时刻只允许用于预览和测试。工作时段通过 WorkScheduleStore 持久化，默认为每日09:00–18:00，支持跨夜，按结束时刻排除。18:00–06:00 独立使用夜间场景。
 - 夜间素材来自 Figma 229:8168；home_room_night.png 是原始背景，home_buddy_night.png 是设计素材的首帧静态 PNG，不能改扩展名冒充 PNG。幸运签周心情区域不得恢复固定高度，需覆盖小屏大字体验证。
-- 全 App 底部统一使用 CompanionNavigation 四入口：首页 / 陪伴视角 / 陪伴日记 / 个人设置。信号图标为摄像头页面，书本为 DiaryScreen；摄像头页独立选中 Camera。视觉以 Figma 303:4309 当前纯图标底栏为准，SVG 在 assets/navigation，禁止回退三 Tab 或将日记绑定信号图标。
+- 1.5 起按用户最新要求删除摄像头页面、顶部摄像头入口及信号 Tab；CompanionNavigation 只保留首页 / 陪伴日记 / 个人设置三个纯图标入口，书本绑定 DiaryScreen。不得重新添加摄像头页。
 - 首页办公动画由 LookBuddyApp 上层 WorkBuddyPlayback 调度：每次进入前台重播一遍，前台每3600000ms重播，末帧保持；切 Tab 不重置已完成状态。日记动画位于轮播外，页面每次进入仅播一遍，翻气泡不重播。心情选择为六张资产图，旧 Tired 记录保留。
+
+- 1.5 首页提醒以 Figma 315:4093 为准；“知道了”必须在近圆形48%白色气泡内部。HomeReminderController 在 Tab 上层保存状态，HomeReminderSource 是未来后端入口；已确认ID去重，动画结束不自动关闭，统计面板展开暂时隐藏浮层。缺少的姿态/起身/开心/担忧完整动作暂为明确记录的占位，后续统一替换 HomeReminder.kt 中 ReminderArtwork。
