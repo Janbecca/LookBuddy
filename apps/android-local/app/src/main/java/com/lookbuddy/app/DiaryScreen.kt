@@ -75,10 +75,10 @@ internal fun DiaryScreen(s: Float) {
             Text(date.format(DateTimeFormatter.ofPattern("M月d日 · E", Locale.CHINA)),
                 color = CompanionMuted, fontSize = (11 * s).sp)
         }
+        BuddyDiaryCarousel(s, showExample)
         if (showExample) {
             Text("设计稿示例 · 非真实时间记录", color = CompanionMuted, fontSize = 12.sp)
             TextButton(onClick = { example = false; dateText = null }) { Text("返回今天", color = CompanionClay) }
-            BuddyDiaryCarousel(s)
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -122,10 +122,10 @@ internal fun DiaryScreen(s: Float) {
 }
 
 @Composable
-private fun BuddyDiaryCarousel(s: Float) {
+private fun BuddyDiaryCarousel(s: Float, example: Boolean) {
     val pager = rememberPagerState(initialPage = 1, pageCount = { 3 })
     val fs = LocalDensity.current.fontScale.coerceAtLeast(1f)
-    val groups = listOf(
+    val groups = if (!example) List(3) { listOf("今天，也很高兴见到你。", "我在这里陪着你。", "记录的小事，会在这里慢慢积攒。") } else listOf(
         listOf("08:05，新的一天，你带着好心情来啦。", "10:10，又给自己补充了一点水分。", "你认真工作的时候，我就安静陪着你。"),
         listOf("17:23，你有点累了。我们一起伸展了一下。", "18:05，今天也辛苦啦，明天见！", "工位也被你收拾好了，今天的小事我都记着。"),
         listOf("13:57，吃饱啦，下午一起慢慢来。", "16:00，今天也有好好喝水。", "每一段小小的日常，都值得被记住。")
@@ -133,8 +133,6 @@ private fun BuddyDiaryCarousel(s: Float) {
     Box(Modifier.fillMaxWidth().height(223.dp * s * fs)) {
         VerticalPager(pager, Modifier.fillMaxSize().testTag("diary_bubbles")) { page ->
             Box(Modifier.fillMaxSize()) {
-                Image(painterResource(R.drawable.diary_buddy), "LookBuddy", Modifier.offset(x = (-13).dp * s, y = 74.dp * s * fs)
-                    .size(121.dp * s, 126.dp * s), contentScale = ContentScale.Crop)
                 DiaryBubble(groups[page][0], 13f, s, Modifier.offset(42.dp * s, 5.dp * s * fs)
                     .width(279.dp * s).heightIn(min = 55.dp * s * fs))
                 DiaryBubble(groups[page][1], 12f, s, Modifier.offset(113.dp * s, 74.dp * s * fs)
@@ -145,6 +143,8 @@ private fun BuddyDiaryCarousel(s: Float) {
                     modifier = Modifier.offset(184.dp * s, 183.dp * s * fs))
             }
         }
+        BuddyWebpOnce(BuddyClip.Introduction, Modifier.offset(x = (-13).dp * s, y = 74.dp * s * fs)
+            .size(121.dp * s, 126.dp * s), "LookBuddy 欢迎你翻开日记")
         Column(Modifier.align(Alignment.TopEnd).padding(top = 59.dp * s * fs, end = 9.dp * s),
             verticalArrangement = Arrangement.spacedBy(5.dp * s)) {
             repeat(3) { index -> Box(Modifier.size(5.dp * s, (if (index == pager.currentPage) 12 else 5).dp * s)

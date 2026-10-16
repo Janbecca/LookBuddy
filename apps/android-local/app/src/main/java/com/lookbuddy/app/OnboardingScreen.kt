@@ -338,13 +338,17 @@ private fun BuddyImage(scale: Float, step: StartupStep = StartupStep.Greeting, m
         OnboardingArtwork(Modifier.align(Alignment.TopCenter)
             .offset(x = (if (step == StartupStep.FormalIntroduction) -11.25f else 0f).dp * scale,
                 y = (if (step == StartupStep.DeviceConnection) -3f else 0f).dp * scale)
-            .requiredSize(width.dp * scale, height.dp * scale))
+            .requiredSize(width.dp * scale, height.dp * scale), step)
     }
 }
 
-/** Single replacement point for future animated IP. Every startup page uses a verified single-frame PNG placeholder. */
+/** Greeting and formal introduction play the supplied WebP once; other pages retain static PNG. */
 @Composable
-internal fun OnboardingArtwork(modifier: Modifier = Modifier) {
+internal fun OnboardingArtwork(modifier: Modifier = Modifier, step: StartupStep = StartupStep.Greeting) {
+    if (step == StartupStep.Greeting || step == StartupStep.FormalIntroduction) {
+        BuddyWebpOnce(BuddyClip.Introduction, modifier, "LookBuddy 和你打招呼")
+        return
+    }
     Image(painterResource(R.drawable.onboarding_buddy_placeholder), "LookBuddy 戴着棕色帽子的小伙伴",
         modifier, contentScale = ContentScale.Crop)
 }

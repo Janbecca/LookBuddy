@@ -35,14 +35,14 @@ class MoodCalendarTest {
         compose.onNodeWithTag("calendar_close").performClick()
         assertNull(MoodStore(context).read(date))
         compose.onNodeWithContentDescription("心情日历").performClick()
-        compose.onNodeWithTag("mood_Tired").assertIsDisplayed()
+        compose.onNodeWithTag("mood_Thoughtful").assertIsDisplayed()
     }
 
     @Test fun choosingTiredPersistsShowsFortuneAndCanChangeWithoutChangingFortune() {
         compose.setContent { MorningHomeScreen(previewDate = date) }
         compose.onNodeWithContentDescription("心情日历").performClick()
-        compose.onNodeWithTag("mood_Tired").performClick()
-        compose.waitUntil(10_000) { MoodStore(context).read(date) == Mood.Tired }
+        compose.onNodeWithTag("mood_Thoughtful").performClick()
+        compose.waitUntil(10_000) { MoodStore(context).read(date) == Mood.Thoughtful }
         // Disk commit precedes the IO coroutine resuming and scheduling the flip.
         compose.waitForIdle()
         compose.mainClock.advanceTimeBy(1000)
@@ -51,7 +51,7 @@ class MoodCalendarTest {
             runCatching { compose.onNodeWithText("今日宜缓").assertIsDisplayed() }.isSuccess
         }
         compose.onNodeWithText("今日宜缓").assertIsDisplayed()
-        compose.onNodeWithTag("recorded_mood").assertTextEquals("轻轻记下了 · 有点累")
+        compose.onNodeWithTag("recorded_mood").assertTextEquals("轻轻记下了 · 思考")
         compose.onNodeWithTag("calendar_close").performClick()
         compose.onNodeWithContentDescription("心情日历").performClick()
         compose.onNodeWithText("今日宜缓").assertIsDisplayed()
@@ -78,11 +78,11 @@ class MoodCalendarTest {
                 if (attempts == 1) false else { records = mapOf(date to it); true }
             })
         }
-        compose.onNodeWithTag("mood_Tired").performClick()
+        compose.onNodeWithTag("mood_Thoughtful").performClick()
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithText("刚刚没记住，再轻点一次好吗？").assertIsDisplayed()
         compose.onNodeWithTag("daily_fortune").assertDoesNotExist()
-        compose.onNodeWithTag("mood_Tired").performClick()
+        compose.onNodeWithTag("mood_Thoughtful").performClick()
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithTag("daily_fortune").assertIsDisplayed()
         assertEquals(2, attempts)

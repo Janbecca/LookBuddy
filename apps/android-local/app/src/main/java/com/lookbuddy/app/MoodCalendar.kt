@@ -48,8 +48,12 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-internal enum class Mood(val label: String, val asset: String) {
-    Happy("开心", "happy"), Calm("平静", "calm"), Tired("有点累", "tired"), Sad("低落", "sad")
+internal enum class Mood(val label: String, val image: Int) {
+    Happy("开心", R.drawable.mood_happy), Calm("平静", R.drawable.mood_calm),
+    Sad("失落", R.drawable.mood_sad), Curious("好奇", R.drawable.mood_curious),
+    Thoughtful("思考", R.drawable.mood_thinking), Excited("振奋", R.drawable.mood_excited),
+    Tired("有点累", R.drawable.mood_thinking); // Legacy records retain their original label.
+    companion object { val pickerOptions = entries.filter { it != Tired } }
 }
 
 /** One record per local calendar date. Editing a mood never redraws the daily fortune. */
@@ -155,10 +159,12 @@ internal fun MoodCalendar(
                         Text("不管什么心情，都可以放在这里", color = CalendarMuted, fontSize = (12 * s).sp,
                             lineHeight = (18 * s).sp, textAlign = TextAlign.Center)
                         Spacer(Modifier.height(8.dp * s))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Mood.entries.forEach { mood ->
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp * s)) {
+                        Mood.pickerOptions.chunked(3).forEach { options ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp * s)) {
+                            options.forEach { mood ->
                                 val selected = pending == mood
-                                Column(Modifier.size(53.dp * s, 72.dp * s)
+                                Column(Modifier.weight(1f).heightIn(min = 94.dp * s)
                                     .graphicsLayer { scaleX = if (selected) 1.04f else 1f; scaleY = scaleX }
                                     .background(if (selected) Color(0xFFF7EDDE) else Color.Transparent, RoundedCornerShape(10.dp * s))
                                     .border(.6.dp, CalendarBorder, RoundedCornerShape(10.dp * s))
@@ -187,6 +193,8 @@ internal fun MoodCalendar(
                                     Text(mood.label, color = CalendarInk, fontSize = (11 * s).sp, lineHeight = (16 * s).sp)
                                 }
                             }
+                        }
+                        }
                         }
                         if (error) Text("刚刚没记住，再轻点一次好吗？", color = Color(0xFFA85E3D),
                             fontSize = (10 * s).sp, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
@@ -234,7 +242,10 @@ private fun CalendarDate(date: LocalDate, s: Float) {
 }
 
 @Composable
-internal fun MoodIcon(mood: Mood, s: Float) = FigmaSvg(mood.asset, s, folder = "companion")
+internal fun MoodIcon(mood: Mood, s: Float, size: Float = 48f) {
+    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(mood.image), mood.label,
+        Modifier.size((size * s).dp), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+}
 
 @Composable
 private fun CalendarWeek(date: LocalDate, records: Map<LocalDate, Mood>, s: Float) {
@@ -260,7 +271,7 @@ private fun CalendarWeek(date: LocalDate, records: Map<LocalDate, Mood>, s: Floa
                     Text(day.dayOfMonth.toString().padStart(2, '0'), color = if (today) Color(0xFFA66E42) else CalendarInk,
                         fontSize = (11 * s).sp, lineHeight = (15 * s).sp)
                     if (mood != null) Box(Modifier.graphicsLayer { alpha = if (today) 1f else .45f }) {
-                        MoodIcon(mood, s * 21f / 26f)
+                        MoodIcon(mood, s, 30f)
                     } else Text("·", color = CalendarMuted, fontSize = (18 * s).sp, lineHeight = (27 * s).sp)
                 }
             }

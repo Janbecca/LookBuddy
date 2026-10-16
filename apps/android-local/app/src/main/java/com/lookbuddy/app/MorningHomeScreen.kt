@@ -113,6 +113,8 @@ internal fun MorningHomeContent(
     schedule: WorkSchedule = rememberWorkSchedule()
 ) {
     var expanded by rememberSaveable { mutableStateOf(initialExpanded) }
+    val workPlayback = LocalWorkPlayback.current ?: rememberWorkBuddyPlayback()
+    val run = workPlayback.generation
     val status = schedule.status(now)
     val night = isNightTime(now.toLocalTime())
     val working = status.working
@@ -175,9 +177,11 @@ internal fun MorningHomeContent(
                 if (night) Image(painterResource(R.drawable.home_buddy_night), "LookBuddy 回家休息",
                     Modifier.align(Alignment.TopStart).wrapContentSize(Alignment.TopStart, unbounded = true).requiredSize(514.dp * s, 369.dp * s)
                         .offset(x = (-58).dp * s, y = (-38).dp * s), contentScale = ContentScale.Fit)
-                else Image(painterResource(R.drawable.home_buddy_desk), "LookBuddy 在桌前陪你工作",
-                    Modifier.align(Alignment.TopCenter).offset(x = (-6).dp * s)
-                        .requiredSize(353.dp * s, 290.dp * s), contentScale = ContentScale.Crop)
+                else BuddyWebpOnce(BuddyClip.Work, description = "LookBuddy 在电脑前办公",
+                    modifier = Modifier.align(Alignment.TopCenter).offset(x = (-6).dp * s)
+                        .requiredSize(353.dp * s, 290.dp * s),
+                    run = run, completed = workPlayback.completed,
+                    onFinished = { workPlayback.finish(run) })
                 // GLM 关心语气泡：在 Buddy IP 旁展示，不阻塞首页加载。
                 // greetingScene 为 null 时跳过（测试 / 预览模式），避免发网络请求。
                 if (greetingScene != null) {

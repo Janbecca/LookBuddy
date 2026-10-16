@@ -40,7 +40,9 @@ internal fun LookBuddyApp(
     val defaultCamera = remember { UnconnectedCameraFeed() }
     val camera = cameraFeed ?: defaultCamera
     val savedPages = rememberSaveableStateHolder()
+    val workPlayback = rememberWorkBuddyPlayback()
     BackHandler(page != CompanionPage.Home) { page = CompanionPage.Home }
+    CompositionLocalProvider(LocalWorkPlayback provides workPlayback) {
     savedPages.SaveableStateProvider(page.name) {
         when (page) {
             CompanionPage.Home -> MorningHomeScreen(onCamera = { page = CompanionPage.Camera },
@@ -54,6 +56,7 @@ internal fun LookBuddyApp(
                 }
             }
         }
+    }
     }
 }
 
