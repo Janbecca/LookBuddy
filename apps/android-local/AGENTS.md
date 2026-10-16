@@ -19,3 +19,5 @@
 - 1.5 首页提醒以 Figma 315:4093 为准；“知道了”必须在近圆形48%白色气泡内部。HomeReminderController 在 Tab 上层保存状态，HomeReminderSource 是未来后端入口；已确认ID去重，动画结束不自动关闭，统计面板展开暂时隐藏浮层。缺少的姿态/起身/开心/担忧完整动作暂为明确记录的占位，后续统一替换 HomeReminder.kt 中 ReminderArtwork。
 
 - 2026-10-16 后端合并：实际 backend 以 main@69622817b38c1ebdf7af846cd8fab9e9826f164f 的 apps/backend 为主，完整导入38个上游文件并保持业务源码与测试原样；本地启动兼容 python app.py/start.bat、5210端口及旧GLM_*环境变量。合并结果对应远端 apps/android-local/backend，旧5文件保存在本地 backend-backups（不提交）；.env/数据库/虚拟环境不提交。GitHub问候接口要求Bearer登录，旧App无令牌请求仍需后续接入；本次没有修改Android页面或绕过鉴权。86项测试和隔离HTTP验证通过。后端后续修改 src/lookbuddy；继续按约定分支同步，具体提交号以工作区同步记录为准。
+
+2026-10-16 Buddy统一语气规则：backend/src/lookbuddy/buddy_prompt.py 封装人格、主动提示、聊天与每次输出前的语病/人格自检。仅主动提示最多30字符（含标点）；聊天无固定字数上限，口语自然、引导倾诉、理解后给建议。仅疲劳、开心表情、可能不轻松表情、晚间问候提供chatEntry聊一聊入口，其他场景为null。事件提醒沿用固定话术，动态问候使用共享Prompt，超长或异常输出回退完整短句，稍后提醒保留表情入口。前端按钮和聊天API尚未实现。本地backend对应约定分支apps/android-local/backend，不更新main或apps/backend。来源基线1dd748503431ab2f29526736592e737cd3cf3556；本次提交号与逐文件核对结果见工作区output/buddy-prompt-20261016/sync-result.json，后续以实际分支最新提交为准。

@@ -9,6 +9,7 @@ from .display_budget import next_display_at
 from .learning import choose
 from .emotion_service import candidate as emotion_candidate
 from .preferences import preferences_for
+from .buddy_prompt import reminder_message
 
 
 @dataclass(frozen=True)
@@ -53,7 +54,7 @@ class ReminderPolicy:
             candidates = [item for item in candidates if "no_drink_observed" not in item.reason_codes]
         expression = emotion_candidate(db, snapshot.user_id, snapshot.session_id, "live", now) if preferences.companion_enabled else None
         if expression:
-            candidates.append(Candidate("emotion", 52, "刚刚观察到一些表情线索，要不要暂停一下，照顾一下此刻的状态？",
+            candidates.append(Candidate("emotion", 52, reminder_message("emotion", expression_label=expression["label"]),
                                         ["visible_expression_stable_30s", "emotion_hypothesis_not_confirmed", expression["label"]]))
         if not preferences.posture_enabled:
             candidates = [item for item in candidates if item.category not in {"sedentary", "posture"}]
@@ -69,14 +70,8 @@ class ReminderPolicy:
             )) or 0
             selection = choose(db, snapshot.user_id, "live", candidate.category, now, recent,
                                visual_state=expression["label"] if candidate.category == "emotion" else None)
-            message = {
-                "posture_light": "试着坐直，放松一下肩膀。",
-                "short_stretch": "要不要做一次短伸展，再调整到自然坐姿？",
-                "short_break": "要不要起来休息一下？我会继续记录起身与休息过程。",
-                "emotion_inquiry": "此刻想聊两句，还是安静待一会儿？你可以随时关闭这条交互。",
-                "gentle_companion": "我在这里陪着你。可以松松肩膀，给自己留一点余地。",
-                "breathing": "要不要一起缓慢吸气，再慢慢呼气？按舒服的节奏来，可以随时停下。",
-            }.get(selection["strategy"], candidate.message)
+            message = reminder_message(candidate.category, selection["strategy"],
+                                       expression["label"] if candidate.category == "emotion" else None)
             reminder = Reminder(
                 user_id=snapshot.user_id,
                 session_id=snapshot.session_id,
@@ -102,7 +97,7 @@ class ReminderPolicy:
                 Candidate(
                     "sedentary",
                     min(100, 65 + int(over / 60000)),
-                    "已经连续工作一段时间了，要不要起来活动一下？",
+                    reminder_message("sedentary"),
                     [f"continuous_presence_{sedentary_minutes}m", "no_recent_break"],
                 )
             )
@@ -111,12 +106,12 @@ class ReminderPolicy:
                 Candidate(
                     "posture",
                     min(100, 58 + int(snapshot.bad_posture_ratio_5m * 40)),
-                    "最近坐姿有些紧绷，试着坐直并放松一下肩膀？",
+                    reminder_message("posture"),
                     ["bad_posture_streak" if snapshot.bad_posture_streak_ms >= 60_000 else "bad_posture_ratio_5m"],
                 )
             )
         if snapshot.last_drink_at is None:
-            result.append(Candidate("drink", 45, "工作间隙记得补充一点水。", ["no_drink_observed"]))
+            result.append(Candidate("drink", 45, reminder_message("drink"), ["no_drink_observed"]))
         else:
             last_drink = snapshot.last_drink_at
             if last_drink.tzinfo is None:
@@ -127,7 +122,7 @@ class ReminderPolicy:
                     Candidate(
                         "drink",
                         min(100, 55 + int((gap - timedelta(minutes=90)).total_seconds() / 120)),
-                        "距离上次喝水有一会儿了，记得补水。",
+                        reminder_message("drink"),
                         ["no_drink_90m"],
                     )
                 )
@@ -136,7 +131,7 @@ class ReminderPolicy:
                 Candidate(
                     "fatigue",
                     min(100, 75 + snapshot.fatigue_signals_10m * 5),
-                    "刚刚出现了一些疲劳线索，建议离开屏幕休息两分钟。",
+                    reminder_message("fatigue"),
                     ["fatigue_signals_repeated"],
                 )
             )

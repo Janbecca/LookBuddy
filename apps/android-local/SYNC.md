@@ -24,3 +24,5 @@
 1.4.x 桌宠目录收敛：弃用临时 `desktop/` Python/Tkinter 原型，正式桌宠统一为 `桌面宠物/LookBuddy_Desktop` Electron 工程。Electron 主进程提供 5211 局域网同步，Android 与桌宠交换状态；AWS 只连接 Android App，桌宠不直接连接云端。
 
 2026-10-16 后端合并：从 main@69622817b38c1ebdf7af846cd8fab9e9826f164f/apps/backend 完整导入38个文件至实际 D盘 backend，业务源码、上游测试和锁文件不改；融合本地 app.py/start.bat/GLM_*配置兼容，仍使用5210端口。旧5文件本地备份、不上传。新增启动兼容测试3项，加上上游共86项通过；真实HTTP验证健康检查、Bearer鉴权、问候和日记通过。合并后的backend同步到本分支 apps/android-local/backend，不更新 main 或 apps/backend；Android与桌宠代码不变，已有未同步的根README/旧desktop差异保留，不宣称整个工程与远端完全一致。
+
+2026-10-16 Buddy统一语气规则：backend/src/lookbuddy/buddy_prompt.py 封装人格、主动提示、聊天与每次输出前的语病/人格自检。仅主动提示最多30字符（含标点）；聊天无固定字数上限，口语自然、引导倾诉、理解后给建议。仅疲劳、开心表情、可能不轻松表情、晚间问候提供chatEntry聊一聊入口，其他场景为null。事件提醒沿用固定话术，动态问候使用共享Prompt，超长或异常输出回退完整短句，稍后提醒保留表情入口。前端按钮和聊天API尚未实现。本地backend对应约定分支apps/android-local/backend，不更新main或apps/backend。来源基线1dd748503431ab2f29526736592e737cd3cf3556；本次提交号与逐文件核对结果见工作区output/buddy-prompt-20261016/sync-result.json，后续以实际分支最新提交为准。

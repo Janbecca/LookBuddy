@@ -77,3 +77,6 @@ Dockerfile 保持上游设计，使用内部 8080 端口，需要按上游部署
 根据项目约定，合并后的本地版本同步到 `codex/android-local-sync` 的
 `apps/android-local/backend`；下载来源仍是 `main` 的 `apps/backend`。
 不覆盖 `main`，不混合两套 Android 实现。详情见 `MERGE.md`。
+
+Buddy 的统一人格、主动提示30字符上限、四类“聊一聊”入口和后续聊天 Prompt，
+见 `BUDDY_PROMPT.md`。共享实现为 `src/lookbuddy/buddy_prompt.py`。

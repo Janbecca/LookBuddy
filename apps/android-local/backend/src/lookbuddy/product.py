@@ -1,6 +1,7 @@
 """Product-page APIs. Demo identity is device scoped and never verifies a phone."""
 from datetime import date, datetime, time, timedelta, timezone
 import hashlib
+import json
 import re
 import secrets
 from typing import Literal
@@ -17,6 +18,7 @@ from .config import get_settings
 from .database import Base, get_db
 from .display_budget import lock_user, utc
 from .greeting_prompt import SYSTEM_PROMPT
+from .buddy_prompt import chat_entry, greeting_fallback, valid_proactive_message
 from .models import Diary, DomainEvent, StateSnapshot, User, WorkSession, utcnow
 from .schemas import TokenPair
 from .security import get_current_user, hash_password
@@ -387,36 +389,44 @@ def live_event(row):
 async def greeting(body: GreetingIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     settings = get_settings()
     if body.scene == "evening_rain":
-        return {"show": False, "message": "", "source": "weather_unavailable", "weather_source": "unavailable"}
+        return {"show": False, "message": "", "source": "weather_unavailable", "weather_source": "unavailable", "chatEntry": None}
     cached = db.get(GreetingCache, user.id)
     if cached and utcnow() - utc(cached.generated_at) < timedelta(minutes=1):
         if cached.scene != body.scene or cached.result.get("message") == body.recent_message:
-            return {"show": False, "message": "", "source": "cooldown", "weather_source": "unavailable"}
-        return cached.result
-    fallback = "慢慢进入工作状态就好，我陪着你。" if body.scene.startswith("morning") else "今天也辛苦啦，给自己留一点休息的时间。"
-    result = {"show": body.recent_message != fallback, "message": fallback, "source": "fallback", "weather_source": "unavailable"}
+            return {"show": False, "message": "", "source": "cooldown", "weather_source": "unavailable", "chatEntry": None}
+        if not cached.result.get("show") or valid_proactive_message(cached.result.get("message")):
+            return {**cached.result, "chatEntry": chat_entry(body.scene) if cached.result.get("show") else None}
+        # Old cache entries are returned as complete reviewed copy, never truncated.
+        message = greeting_fallback(body.scene)
+        show = message != body.recent_message
+        return {"show": show, "message": message if show else "", "source": "fallback",
+                "weather_source": "unavailable", "chatEntry": chat_entry(body.scene) if show else None}
+    fallback = greeting_fallback(body.scene)
+    result = {"show": body.recent_message != fallback, "message": fallback, "source": "fallback", "weather_source": "unavailable", "chatEntry": None}
     if settings.greeting_base_url and settings.greeting_api_key:
         try:
             async with httpx.AsyncClient(timeout=12) as client:
                 response = await client.post(settings.greeting_base_url.rstrip("/") + "/chat/completions",
                     headers={"Authorization": "Bearer " + settings.greeting_api_key},
                     json={"model": settings.greeting_model, "messages": [{"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": f"场景{body.scene}；在岗状态unknown；weather_valid=false；当地时间{datetime.now(ZoneInfo(user.timezone)).isoformat()}；上一句{body.recent_message}"}], "temperature": 0.5})
+                        {"role": "user", "content": json.dumps({"scene": body.scene, "presence": "unknown",
+                            "weather_valid": False, "local_time": datetime.now(ZoneInfo(user.timezone)).isoformat(),
+                            "recent_message": body.recent_message}, ensure_ascii=False)}], "temperature": 0.5})
                 response.raise_for_status()
-                import json
                 parsed = json.loads(response.json()["choices"][0]["message"]["content"])
-                if type(parsed.get("show")) is bool and isinstance(parsed.get("message"), str) and (not parsed["show"] or parsed["message"].strip()):
-                    result = {**result, "show": parsed["show"], "message": parsed["message"][:200] if parsed["show"] else "", "source": "glm"}
+                if isinstance(parsed, dict) and type(parsed.get("show")) is bool and isinstance(parsed.get("message"), str) and (not parsed["show"] or valid_proactive_message(parsed["message"])):
+                    result = {**result, "show": parsed["show"], "message": parsed["message"].strip() if parsed["show"] else "", "source": "glm"}
         except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError):
             pass
+    result["chatEntry"] = chat_entry(body.scene) if result["show"] else None
     if result["message"] == body.recent_message:
-        result["show"], result["message"] = False, ""
+        result["show"], result["message"], result["chatEntry"] = False, "", None
     # Re-check under the per-user lock after the network await, avoiding duplicate
     # inserts when two screens request their first greeting concurrently.
     lock_user(db, user.id)
     cached = db.get(GreetingCache, user.id, populate_existing=True)
     if cached is not None and utcnow() - utc(cached.generated_at) < timedelta(minutes=1):
-        return {"show": False, "message": "", "source": "cooldown", "weather_source": "unavailable"}
+        return {"show": False, "message": "", "source": "cooldown", "weather_source": "unavailable", "chatEntry": None}
     if cached is None:
         cached = GreetingCache(user_id=user.id)
         db.add(cached)

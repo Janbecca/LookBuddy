@@ -1,7 +1,10 @@
 from datetime import date, datetime, timezone
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, computed_field
+
+
+from .buddy_prompt import chat_entry
 
 
 class ApiModel(BaseModel):
@@ -321,6 +324,15 @@ class ReminderPublic(ApiModel):
     reason_codes: list[str] = Field(serialization_alias="reasonCodes")
     created_at: datetime = Field(serialization_alias="createdAt")
     expires_at: datetime = Field(serialization_alias="expiresAt")
+
+
+    @computed_field(alias="chatEntry")
+    @property
+    def chat_entry(self) -> dict[str, str] | None:
+        if self.status == "silent":
+            return None
+        label = next((code for code in self.reason_codes if chat_entry("emotion", code)), None)
+        return chat_entry(self.category, label)
 
 
 class SnapshotResponse(ApiModel):

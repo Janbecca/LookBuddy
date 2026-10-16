@@ -65,6 +65,7 @@ def dispatch(db: Session, user_id: str, at: datetime) -> list[str]:
             job.due_at, job.reason = at + timedelta(seconds=15), "waiting_for_fresh_online_context"
             continue
         from .reminder_policy import ReminderPolicy
+        from .buddy_prompt import reminder_message
         expression = emotion_candidate(db, user_id, root.session_id, "live", at) if root.category == "emotion" else None
         still_triggered = bool(expression) if root.category == "emotion" else root.category in {candidate.category for candidate in ReminderPolicy()._candidates(latest, at, preferences.sedentary_minutes)}
         if not still_triggered:
@@ -73,7 +74,9 @@ def dispatch(db: Session, user_id: str, at: datetime) -> list[str]:
             continue
         original = db.get(Reminder, root.id)
         reminder = Reminder(user_id=user_id, session_id=root.session_id, category=root.category,
-                            priority=original.priority, message=original.message, reason_codes=["snooze_due"],
+                            priority=original.priority,
+                            message=reminder_message(root.category, root.strategy, expression["label"] if expression else None),
+                            reason_codes=["snooze_due"] + ([expression["label"]] if expression else []),
                             expires_at=at + timedelta(minutes=10), created_at=at)
         db.add(reminder)
         db.flush()
