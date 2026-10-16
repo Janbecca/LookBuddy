@@ -119,12 +119,16 @@ fun rememberBuddyGreeting(
     baseUrl: String = BuddyGreetingConfig.EMULATOR_URL,
     scene: String = "morning_seated"
 ): StateFlow<BuddyGreeting> {
+    val product = LocalProduct.current
     val repository = remember(baseUrl) { BuddyGreetingRepository(baseUrl) }
     val greeting = remember(scene, baseUrl) { MutableStateFlow(BuddyGreeting.Idle) }
     LaunchedEffect(scene, baseUrl) {
-        val result = repository.fetch(GreetingRequest(scene))
+        val result = if (product != null) runCatching {
+            val response = JSONObject(product.request("/buddy/greeting", "POST", JSONObject().put("scene", scene)))
+            BuddyGreeting(response.getBoolean("show"), response.getString("message"), response.getString("source"))
+        }.getOrNull() else repository.fetch(GreetingRequest(scene))
         if (result != null) greeting.value = result
         // 失败时保持 Idle，首页正常展示，不阻塞。
     }
-    return remember { greeting.asStateFlow() }
+    return remember(greeting) { greeting.asStateFlow() }
 }

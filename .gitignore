@@ -12,6 +12,8 @@ htmlcov/
 .mypy_cache/
 *.pyc
 *.db
+*.db-wal
+*.db-shm
 *.log
 .DS_Store
 node_modules/
@@ -48,4 +50,8 @@ Thumbs.db
 coverage/
 tmp/
 temp/
+.playwright-cli/
+output/
+apps/android-local/integration-build/
+apps/android-local/integration/build/
 

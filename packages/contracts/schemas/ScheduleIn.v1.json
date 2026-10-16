@@ -1,0 +1,22 @@
+{
+  "properties": {
+    "start": {
+      "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$",
+      "title": "Start",
+      "type": "string"
+    },
+    "end": {
+      "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$",
+      "title": "End",
+      "type": "string"
+    }
+  },
+  "required": [
+    "start",
+    "end"
+  ],
+  "title": "ScheduleIn",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:ScheduleIn"
+}

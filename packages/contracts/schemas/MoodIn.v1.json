@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "mood": {
+      "enum": [
+        "Happy",
+        "Calm",
+        "Tired",
+        "Sad"
+      ],
+      "title": "Mood",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mood"
+  ],
+  "title": "MoodIn",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:MoodIn"
+}

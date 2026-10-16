@@ -114,11 +114,12 @@ internal fun MorningHomeContent(
 ) {
     var expanded by rememberSaveable { mutableStateOf(initialExpanded) }
     val status = schedule.status(now)
+    val product = LocalProduct.current
     val night = isNightTime(now.toLocalTime())
     val working = status.working
     val context = LocalContext.current
     val inspection = androidx.compose.ui.platform.LocalInspectionMode.current
-    val companionDays = remember(now.toLocalDate(), inspection) { if (inspection) 1L else WorkScheduleStore(context).companionDays(now.toLocalDate()) }
+    val companionDays = product?.summary?.optLong("companionDays", 1) ?: remember(now.toLocalDate(), inspection) { if (inspection) 1L else WorkScheduleStore(context).companionDays(now.toLocalDate()) }
     val scope = rememberCoroutineScope()
     val drawerMotion = remember { StatisticsDrawerMotion(expanded, scope) }
     BoxWithConstraints(Modifier.fillMaxSize().clipToBounds().testTag("morning_home")) {
@@ -169,6 +170,11 @@ internal fun MorningHomeContent(
                     Box(Modifier.fillMaxHeight().fillMaxWidth(status.progress).background(BuddyCream.copy(alpha = .6f)))
                 }
                 WorkTime("距下班时间", displayDuration(status.remainingMinutes), s)
+            }
+            if (product != null) androidx.compose.material3.TextButton(
+                onClick = { if (product.current == null) product.startWork() else product.finishWork() }, enabled = !product.busy,
+                modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text(if (product.current == null) "开始实际陪伴" else "结束实际陪伴", color = HomeInk)
             }
             Spacer(Modifier.height((if (night) 31 else 19).dp * s))
             Box(Modifier.fillMaxWidth().height((if (night) 343 else 277).dp * s).clipToBounds()) {
@@ -346,14 +352,15 @@ private fun StatisticsDrawer(
 
 @Composable
 private fun PrimaryStatistics(s: Float) {
+    val summary = LocalProduct.current?.summary
     Row(Modifier.fillMaxWidth().height(152.dp * s), horizontalArrangement = Arrangement.spacedBy(12.dp * s)) {
         Column(Modifier.width(104.dp * s).fillMaxHeight().background(HomeCard, RoundedCornerShape(18.dp)),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             IconTile("focus", Color(0xFFFFF1E5), 36f, 12f, s)
             Spacer(Modifier.height(10.dp * s))
-            Text("专注工作", color = HomeMuted, fontSize = (12 * s).sp)
+            Text("工作陪伴", color = HomeMuted, fontSize = (12 * s).sp)
             Spacer(Modifier.height(10.dp * s))
-            Text("待记录", color = HomeInk, fontSize = (18 * s).sp, fontWeight = FontWeight.Bold)
+            Text(summary?.let { displayDuration(it.optLong("workMs") / 60000) } ?: "待记录", color = HomeInk, fontSize = (18 * s).sp, fontWeight = FontWeight.Bold)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp * s)) {
             Row(Modifier.fillMaxWidth().height(46.dp * s).background(Color(0xFFFFF5EA), RoundedCornerShape(14.dp))
@@ -361,11 +368,11 @@ private fun PrimaryStatistics(s: Float) {
                 Text("今日状态", color = Color(0xFF7A634F), fontSize = (12 * s).sp, modifier = Modifier.weight(1f))
                 FigmaSvg("fire", s)
                 Spacer(Modifier.width(7.dp * s))
-                Text("干劲满满", color = Color(0xFF9E5436), fontSize = (14 * s).sp)
+                Text("待观察", color = Color(0xFF9E5436), fontSize = (14 * s).sp)
             }
             Row(Modifier.fillMaxWidth().height(96.dp * s), horizontalArrangement = Arrangement.spacedBy(10.dp * s)) {
-                SmallStatistic("tea", "今日饮水", "5 次", Color(0xFFECF4F4), s, Modifier.weight(1f))
-                SmallStatistic("stretch", "伸展次数", "2次", Color(0xFFF1F4E8), s, Modifier.weight(1f))
+                SmallStatistic("tea", "今日饮水", summary?.let { "${it.optInt("drinkCount")} 次" } ?: "待记录", Color(0xFFECF4F4), s, Modifier.weight(1f))
+                SmallStatistic("stretch", "伸展次数", summary?.let { "${it.optInt("stretchCount")} 次" } ?: "待记录", Color(0xFFF1F4E8), s, Modifier.weight(1f))
             }
         }
     }
@@ -390,6 +397,7 @@ private fun IconTile(icon: String, color: Color, size: Float, radius: Float, s: 
 
 @Composable
 private fun SupplementaryStatistics(s: Float) {
+    val summary = LocalProduct.current?.summary
     Row(Modifier.fillMaxWidth().height(108.dp * s), horizontalArrangement = Arrangement.spacedBy(12.dp * s)) {
         Column(Modifier.weight(1f).fillMaxHeight().background(HomeCard, RoundedCornerShape(18.dp))
             .padding(horizontal = 14.dp * s, vertical = 12.dp * s)) {
@@ -400,7 +408,7 @@ private fun SupplementaryStatistics(s: Float) {
             }
             Spacer(Modifier.height(12.dp * s))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("--", color = HomeInk, fontSize = (32 * s).sp, fontWeight = FontWeight.Bold)
+                Text(summary?.let { "%.1f".format(it.optLong("monthWorkMs") / 3600000.0) } ?: "--", color = HomeInk, fontSize = (32 * s).sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(7.dp * s))
                 Text("小时", color = Color(0xFF7A6657), fontSize = (13 * s).sp)
             }
@@ -409,14 +417,14 @@ private fun SupplementaryStatistics(s: Float) {
             Row(Modifier.fillMaxWidth().height(49.dp * s).background(Color(0xFFF1F6EB), RoundedCornerShape(14.dp))
                 .padding(horizontal = 12.dp * s), verticalAlignment = Alignment.CenterVertically) {
                 Text("今日坐姿", color = Color(0xFF7A6657), fontSize = (12 * s).sp, modifier = Modifier.weight(1f))
-                Text("腰倍儿直", color = Color(0xFF738C57), fontSize = (14 * s).sp)
+                Text(if (summary?.optJSONObject("state")?.optString("posture") == "bad") "可以调整一下" else "待观察", color = Color(0xFF738C57), fontSize = (14 * s).sp)
             }
             Row(Modifier.fillMaxWidth().height(49.dp * s).background(Color(0xFFF0F6F7), RoundedCornerShape(14.dp))
                 .padding(horizontal = 12.dp * s), verticalAlignment = Alignment.CenterVertically) {
                 FigmaSvg("moon", s)
                 Spacer(Modifier.width(6.dp * s))
                 Text("今日小憩", color = Color(0xFF7A6657), fontSize = (12 * s).sp, modifier = Modifier.weight(1f))
-                Text("待记录", color = HomeInk, fontSize = (16 * s).sp, fontWeight = FontWeight.Bold)
+                Text(summary?.let { "${it.optLong("breakMs") / 60000}min" } ?: "待记录", color = HomeInk, fontSize = (16 * s).sp, fontWeight = FontWeight.Bold)
             }
         }
     }

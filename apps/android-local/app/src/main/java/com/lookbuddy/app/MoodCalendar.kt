@@ -84,23 +84,28 @@ internal fun MorningHomeScreen(
 ) {
     val context = LocalContext.current
     val store = remember(context) { MoodStore(context) }
+    val product = LocalProduct.current
     val now = rememberAppTime(previewTime ?: previewDate?.atTime(9, 0))
     val date = now.toLocalDate()
     var open by rememberSaveable { mutableStateOf(initialCalendarOpen) }
-    var records by remember(date) { mutableStateOf(previewRecords ?: store.week(date)) }
+    var records by remember(date) { mutableStateOf(previewRecords ?: product?.moods ?: store.week(date)) }
+    LaunchedEffect(product?.moods, date) {
+        if (product != null) records = product.moods
+    }
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().then(if (open) Modifier.blur(2.dp).clearAndSetSemantics {} else Modifier)) {
             // previewDate 非空时为测试 / 预览模式，跳过 GLM 气泡请求避免网络干扰
-            MorningHomeContent(initialExpanded, greetingScene = if (previewDate != null) null else "morning_seated",
+            MorningHomeContent(initialExpanded, greetingScene = if (previewDate != null) null else if (isNightTime(now.toLocalTime())) "evening" else "morning_unknown",
                 onCamera = onCamera, onDiary = onDiary, onSettings = onSettings, onCalendar = {
-                records = previewRecords ?: store.week(date)
+                records = previewRecords ?: product?.moods ?: store.week(date)
                 open = true
             }, now = now)
         }
         if (open) key(date) {
             val recordDate = date
             MoodCalendar(recordDate, records, onDismiss = { open = false }, onSave = { mood ->
-                val success = withContext(Dispatchers.IO) { runCatching { store.save(recordDate, mood) }.getOrDefault(false) }
+                val success = if (product != null) product.saveMood(recordDate, mood)
+                    else withContext(Dispatchers.IO) { runCatching { store.save(recordDate, mood) }.getOrDefault(false) }
                 if (success) records = records + (recordDate to mood)
                 success
             })

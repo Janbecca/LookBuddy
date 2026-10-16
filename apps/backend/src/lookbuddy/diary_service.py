@@ -31,6 +31,7 @@ class DiaryCurator:
             .order_by(DomainEvent.occurred_at)
         ).all()
 
+        events = [event for event in events if event.source.get("namespace") != "demo" and event.source.get("kind") not in {"simulated", "replay"}]
         counts = Counter(event.type for event in events)
         candidates: list[dict[str, Any]] = []
         drinks = counts["behavior.drink_detected"]
@@ -113,6 +114,8 @@ async def generate_diary(db: Session, user: User, diary_date: date) -> Diary:
         diary = Diary(user_id=user.id, diary_date=diary_date, candidates=candidates, content=content, generated_by=generated_by)
         db.add(diary)
     else:
+        if diary.status == "edited":
+            return diary
         diary.candidates = candidates
         diary.content = content
         diary.generated_by = generated_by

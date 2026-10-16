@@ -1,0 +1,25 @@
+{
+  "properties": {
+    "scene": {
+      "default": "morning_unknown",
+      "enum": [
+        "morning_seated",
+        "morning_unknown",
+        "evening_rain",
+        "evening"
+      ],
+      "title": "Scene",
+      "type": "string"
+    },
+    "recent_message": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Recent Message",
+      "type": "string"
+    }
+  },
+  "title": "GreetingIn",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:GreetingIn"
+}

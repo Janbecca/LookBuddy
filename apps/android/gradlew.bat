@@ -25,11 +25,12 @@ echo ERROR: JAVA_HOME is set to an invalid directory: %JAVA_HOME% 1>&2
 goto fail
 :execute
 "%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain %*
+set EXIT_CODE=%ERRORLEVEL%
 goto end
 :fail
 set EXIT_CODE=%ERRORLEVEL%
 if %EXIT_CODE% equ 0 set EXIT_CODE=1
 exit /b %EXIT_CODE%
 :end
-endlocal
+endlocal & exit /b %EXIT_CODE%
 

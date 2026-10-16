@@ -10,7 +10,7 @@ from .models import SchemaRevision
 
 
 REVISION = "20261008_p0_learning_foundation"
-REVISIONS = (REVISION, "20261008_p2_scheduler", "20261008_p3_expression")
+REVISIONS = (REVISION, "20261008_p2_scheduler", "20261008_p3_expression", "20261016_product_pages")
 
 
 def migrate(bind: Engine) -> None:

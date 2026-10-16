@@ -199,8 +199,14 @@ def create_session(body: SessionCreate, user: User = Depends(get_current_user), 
 def finish_session(session_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> WorkSession:
     lock_user(db, user.id)
     work_session = owned_session(db, user.id, session_id)
+    if work_session.status == "finished":
+        return work_session
     work_session.status = "finished"
     work_session.ended_at = utcnow()
+    db.add(DomainEvent(id=f"evt_work_{work_session.id}", user_id=user.id, session_id=session_id,
+        type="work.session_completed", occurred_at=work_session.ended_at,
+        duration_ms=max(0, int((work_session.ended_at - work_session.started_at.replace(tzinfo=timezone.utc)).total_seconds() * 1000)),
+        source={"kind": "work_session", "namespace": "live"}, payload={}))
     from .action_service import outcome
     for intervention in db.scalars(select(Intervention).where(Intervention.session_id == session_id, Intervention.status.in_((*ACTIVE, "snoozed")))):
         state = dict(intervention.context.get("verification", {}))

@@ -13,6 +13,8 @@ from lookbuddy.schemas import (
     ExpressionIn, ExpressionPublic, ExpressionFeatures, LocalCaptureIn,
 )
 
+from lookbuddy.product import DemoPhoneIn, ProfilePatch, ScheduleIn, OwnerIn, MoodIn, MarkIn, GreetingIn
+
 target = root / "packages/contracts/schemas"
 target.mkdir(parents=True, exist_ok=True)
 for model in (
@@ -20,6 +22,7 @@ for model in (
     PreferencesPatch, PreferencesPublic, ReminderPublic, ReminderRespondRequest, StateSnapshotIn,
     VisionSampleIn, DemoInterventionIn, ObservationPublic, SnapshotResponse,
     ExpressionIn, ExpressionPublic, ExpressionFeatures, LocalCaptureIn,
+    DemoPhoneIn, ProfilePatch, ScheduleIn, OwnerIn, MoodIn, MarkIn, GreetingIn,
 ):
     mode = "serialization" if model.__name__.endswith("Public") else "validation"
     schema = model.model_json_schema(by_alias=True, mode=mode)

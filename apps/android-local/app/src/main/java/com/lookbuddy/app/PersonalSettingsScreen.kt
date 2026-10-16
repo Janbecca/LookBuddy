@@ -45,8 +45,9 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
     val context = LocalContext.current
+    val product = LocalProduct.current
     val preferences = remember(context) { context.getSharedPreferences("lookbuddy_onboarding", Context.MODE_PRIVATE) }
-    var nickname by remember { mutableStateOf(preferences.getString("nickname", "") ?: "") }
+    var nickname by remember(product?.user?.optString("displayName")) { mutableStateOf(product?.user?.optString("displayName") ?: preferences.getString("nickname", "") ?: "") }
     var dialog by rememberSaveable { mutableStateOf<String?>(null) }
     var editing by rememberSaveable { mutableStateOf(nickname) }
     var saving by remember { mutableStateOf(false) }
@@ -62,7 +63,11 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
             val nextStart = if (start) selected else schedule.start
             val nextEnd = if (start) schedule.end else selected
             if (nextStart == nextEnd) scheduleError = "上班与下班时间不能相同。"
-            else { scheduleStore.save(WorkSchedule(nextStart, nextEnd)); scheduleError = null }
+            else {
+                if (product != null) product.saveSchedule(WorkSchedule(nextStart, nextEnd))
+                else scheduleStore.save(WorkSchedule(nextStart, nextEnd))
+                scheduleError = null
+            }
         }, time.hour, time.minute, true).show()
     }
     val replayIntroduction = LocalReplayIntroduction.current
@@ -74,7 +79,7 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
             saving = true
             keyboard?.hide(); focus.clearFocus()
             scope.launch {
-                val ok = withContext(Dispatchers.IO) {
+                val ok = if (product != null) product.saveName(editing) else withContext(Dispatchers.IO) {
                     runCatching { preferences.edit().putString("nickname", editing).commit() }.getOrDefault(false)
                 }
                 saving = false
@@ -103,7 +108,7 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
                 keyboardActions = KeyboardActions(onDone = { keyboard?.hide(); focus.clearFocus() }),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).background(Color.White, RoundedCornerShape(12.dp))
                     .border(1.dp, CompanionBorder, RoundedCornerShape(12.dp)).padding(14.dp).testTag("profile_nickname"))
-            Text("昵称保存在这台设备上。头像暂用设计稿示例。", color = CompanionMuted, fontSize = 12.sp)
+            Text("昵称同步至后端。头像暂用设计稿示例。", color = CompanionMuted, fontSize = 12.sp)
             error?.let { Text(it, color = CompanionClay) }
         }
         return
@@ -143,9 +148,14 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
             title = { Text(selected, color = CompanionInk) },
             text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when (selected) {
-                    "账号安全" -> Text("当前为本地体验，尚未接入真实账号登录。昵称和心情记录保存在这台设备上。", color = CompanionMuted)
+                    "账号安全" -> {
+                        Text("演示身份 · 手机号未验证。数据按此设备隔离。${product?.user?.optString("phoneMasked").orEmpty()}", color = CompanionMuted)
+                        TextButton(onClick = { product?.logout(); dialog = null }) { Text("退出登录") }
+                        TextButton(onClick = { dialog = "删除账号" }) { Text("删除演示账号和云端数据") }
+                    }
+                    "删除账号" -> Text("确认删除当前演示账号及其全部云端记录？")
                     "系统设置" -> Text("可在 Android 应用设置中管理 LookBuddy 的权限、通知和存储。", color = CompanionMuted)
-                    "设备连接" -> Text("在陪伴视角查看摄像头连接状态、原视频和记录高光时刻。", color = CompanionMuted)
+                    "设备连接" -> EufyConnectionForm()
                 }
                 if (selected == "系统设置") {
                     Text("工作时间（每日）", color = CompanionInk)
@@ -169,6 +179,7 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
             confirmButton = {
                 TextButton(enabled = !saving, onClick = {
                     when (selected) {
+                        "删除账号" -> { product?.deleteAccount(); dialog = null }
                         "设备连接" -> { dialog = null; onCamera() }
                         "系统设置" -> runCatching {
                             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))

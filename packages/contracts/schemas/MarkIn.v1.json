@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "eventId": {
+      "maxLength": 64,
+      "minLength": 8,
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "title": "Eventid",
+      "type": "string"
+    },
+    "occurredAt": {
+      "format": "date-time",
+      "title": "Occurredat",
+      "type": "string"
+    },
+    "note": {
+      "default": "主动记录了一个瞬间",
+      "maxLength": 200,
+      "title": "Note",
+      "type": "string"
+    }
+  },
+  "required": [
+    "eventId",
+    "occurredAt"
+  ],
+  "title": "MarkIn",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:MarkIn"
+}

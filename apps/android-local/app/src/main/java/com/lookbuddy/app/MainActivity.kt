@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             MaterialTheme {
-                LookBuddyStartup { LookBuddyApp() }
+                ProductHost { LookBuddyStartup { LookBuddyApp(cameraFeed = LocalProduct.current?.camera) } }
             }
         }
     }

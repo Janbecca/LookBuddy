@@ -1,0 +1,17 @@
+{
+  "properties": {
+    "installationId": {
+      "maxLength": 64,
+      "minLength": 32,
+      "title": "Installationid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "installationId"
+  ],
+  "title": "OwnerIn",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lookbuddy:contract:v1:OwnerIn"
+}

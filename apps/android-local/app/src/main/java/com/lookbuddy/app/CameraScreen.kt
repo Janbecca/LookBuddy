@@ -44,6 +44,7 @@ internal fun CameraPlaceholder(modifier: Modifier) {
 
 @Composable
 internal fun CameraScreen(feed: CameraFeed, s: Float, previewTime: LocalDateTime? = null) {
+    val product = LocalProduct.current
     val state by feed.state.collectAsState()
     val owner = LocalLifecycleOwner.current
     DisposableEffect(feed, owner) {
@@ -106,7 +107,15 @@ internal fun CameraScreen(feed: CameraFeed, s: Float, previewTime: LocalDateTime
         Row(Modifier.fillMaxWidth().heightIn(min = 52.dp * s)
             .shadow(4.dp, RoundedCornerShape(12.dp * s)).clip(RoundedCornerShape(12.dp * s))
             .background(CompanionClay).clickable(enabled = !saving, role = Role.Button) {
-                if (!ready) feedback = "请先连接摄像头，并等待视频缓冲就绪。"
+                if (product != null) {
+                    saving = true
+                    scope.launch {
+                        try { feedback = product.mark() }
+                        catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) { feedback = "标记保存失败，请重试。" }
+                        finally { saving = false }
+                    }
+                } else if (!ready) feedback = "请先连接摄像头，并等待视频缓冲就绪。"
                 else {
                     saving = true; feedback = null
                     scope.launch {
@@ -134,7 +143,7 @@ internal fun CameraScreen(feed: CameraFeed, s: Float, previewTime: LocalDateTime
                 Spacer(Modifier.width(8.dp * s))
                 Text("什么是 Mark 一刻？", color = CompanionInk, fontSize = (14 * s).sp)
             }
-            Text("记录点击前后的 5 秒视频，\n手动标记，下载属于你的高光时刻。", color = CompanionMuted,
+            Text("手动标记时间与备注，进入你的工位日记。\n本轮不录制点击前后的视频。", color = CompanionMuted,
                 fontSize = (13 * s).sp, lineHeight = (21 * s).sp)
         }
     }

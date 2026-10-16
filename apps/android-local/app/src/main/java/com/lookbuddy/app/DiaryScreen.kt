@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -58,6 +59,7 @@ internal val DiaryExampleEntries = listOf(
 
 @Composable
 internal fun DiaryScreen(s: Float) {
+    val product = LocalProduct.current
     val today = rememberAppTime().toLocalDate()
     var dateText by rememberSaveable { mutableStateOf<String?>(null) }
     var example by rememberSaveable { mutableStateOf(false) }
@@ -66,6 +68,18 @@ internal fun DiaryScreen(s: Float) {
     var detail by remember { mutableStateOf<DiaryEntry?>(null) }
     val context = LocalContext.current
     val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    var page by remember(date) { mutableStateOf<org.json.JSONObject?>(null) }
+    var loadError by remember(date) { mutableStateOf<String?>(null) }
+    var editing by remember(date) { mutableStateOf(false) }
+    var edited by remember(date) { mutableStateOf("") }
+    var confirmDelete by remember { mutableStateOf(false) }
+    suspend fun reload() {
+        try { page = org.json.JSONObject(product!!.request("/v1/diary-page/$date")); loadError = null }
+        catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (_: Exception) { loadError = "日记读取失败，请重试" }
+    }
+    LaunchedEffect(date, product?.user?.optString("id")) { if (product != null) reload() }
     LaunchedEffect(date) { scroll.scrollTo(0) }
     Column(Modifier.fillMaxSize().testTag("diary_screen").verticalScroll(scroll)
         .padding(horizontal = 20.dp * s).padding(top = 10.dp * s, bottom = 28.dp * s),
@@ -74,6 +88,26 @@ internal fun DiaryScreen(s: Float) {
             Text("陪伴日记", color = CompanionInk, fontSize = (22 * s).sp, modifier = Modifier.weight(1f))
             Text(date.format(DateTimeFormatter.ofPattern("M月d日 · E", Locale.CHINA)),
                 color = CompanionMuted, fontSize = (11 * s).sp)
+        }
+        if (!showExample && product != null) {
+            Row {
+                TextButton(enabled = !product.busy, onClick = { product.action { product.request("/v1/diaries/$date/generate", "POST", org.json.JSONObject()); reload() } }) { Text("生成日记") }
+                TextButton(onClick = { edited = page?.optString("content").orEmpty(); editing = true }) { Text("编辑") }
+                TextButton(onClick = { confirmDelete = true }) { Text("删除正文") }
+                TextButton(onClick = { scope.launch { reload() } }) { Text("刷新") }
+            }
+            loadError?.let { Text(it, color = CompanionClay) }
+            page?.optString("content")?.takeIf { it.isNotBlank() }?.let { Text(it, color = CompanionInk) }
+            val entries = page?.optJSONArray("entries")
+            if (entries == null || entries.length() == 0) Text("这一天还没有记录", color = CompanionMuted)
+            else for (i in 0 until entries.length()) {
+                val entry = entries.getJSONObject(i)
+                Column(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(12.dp)).padding(16.dp)) {
+                    Text("${entry.getString("time")} · ${entry.getString("category")}", color = CompanionMuted)
+                    Text(entry.getString("title"), color = CompanionInk)
+                    Text(entry.optString("description"), color = CompanionMuted)
+                }
+            }
         }
         if (showExample) {
             Text("设计稿示例 · 非真实时间记录", color = CompanionMuted, fontSize = 12.sp)
@@ -101,7 +135,7 @@ internal fun DiaryScreen(s: Float) {
                 DiaryExampleEntries.forEachIndexed { i, entry -> DiaryTimelineEntry(entry, i, s) { detail = entry } }
             }
             Text("示例日记 · 来自设计稿，后续接入真实记录", color = CompanionMuted, fontSize = (11 * s).sp)
-        } else {
+        } else if (product == null) {
             Column(Modifier.fillMaxWidth().padding(vertical = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("这一天还没有记录", color = CompanionInk, fontSize = 18.sp)
                 Spacer(Modifier.height(12.dp))
@@ -110,6 +144,16 @@ internal fun DiaryScreen(s: Float) {
             }
         }
     }
+    if (editing) AlertDialog(onDismissRequest = { editing = false }, title = { Text("编辑日记") },
+        text = { androidx.compose.material3.OutlinedTextField(edited, { edited = it }) },
+        confirmButton = { TextButton(onClick = { product?.action {
+            product.request("/v1/diaries/$date", "PATCH", org.json.JSONObject().put("content", edited)); reload(); editing = false
+        } }) { Text("保存") } }, dismissButton = { TextButton(onClick = { editing = false }) { Text("取消") } })
+    if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("删除这天的日记正文？") },
+        text = { Text("结构化时间线仍保留，之后可重新生成。") },
+        confirmButton = { TextButton(onClick = { product?.action {
+            product.request("/v1/diaries/$date", "DELETE"); reload(); confirmDelete = false
+        } }) { Text("确认删除") } }, dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } })
     detail?.let { entry ->
         AlertDialog(onDismissRequest = { detail = null }, containerColor = CompanionPaper,
             title = { Text("${entry.time} · ${entry.title}", color = CompanionInk) },

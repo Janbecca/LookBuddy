@@ -4,6 +4,8 @@ plugins {
     id("com.android.compose.screenshot") version "0.0.1-alpha16"
 }
 
+apply(from = "sdk-dependencies.gradle.kts")
+
 android {
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
     namespace = "com.lookbuddy.app"
@@ -15,8 +17,8 @@ android {
         applicationId = "com.lookbuddy.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 6
-        versionName = "1.3.0"
+        versionCode = 7
+        versionName = "1.3.1-integration"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -34,6 +36,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true

@@ -134,6 +134,8 @@ dependencies {
 // system codepage before -Dfile.encoding applies. Stage only non-ASCII runtime
 // entries into an ASCII temp path; never relocate or modify source files.
 tasks.withType<Test>().configureEach {
+    // A different integration backend must never reuse an earlier skipped result.
+    inputs.property("lookbuddyIntegrationBaseUrl", providers.environmentVariable("LOOKBUDDY_ANDROID_INTEGRATION_BASE_URL").orElse(""))
     doFirst {
         if (System.getProperty("os.name").startsWith("Windows") && classpath.files.any { file -> file.absolutePath.any { it.code > 127 } }) {
             val stage = Files.createTempDirectory("lookbuddy-jvm-").toFile()

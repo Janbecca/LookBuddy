@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 internal val BuddyCream = Color(0xFFFFF3E2)
 private val BuddyClay = Color(0xFFB4745C)
@@ -72,17 +73,25 @@ internal enum class StartupStep {
     fun previous(): StartupStep = entries[(ordinal - 1).coerceAtLeast(Greeting.ordinal)]
 }
 
-/** Local prototype login. Every input, including empty text, is accepted. */
+/** Product host uses explicitly labelled demo identity; previews keep local flow. */
 @Composable
 internal fun LookBuddyStartup(home: @Composable () -> Unit) {
     val preferences = LocalContext.current.getSharedPreferences("lookbuddy_onboarding", Context.MODE_PRIVATE)
-    var registered by remember { mutableStateOf(preferences.getInt("flow_version", 0) >= CurrentOnboardingVersion) }
+    val product = LocalProduct.current
+    val loginScope = rememberCoroutineScope()
+    var loginBusy by remember { mutableStateOf(false) }
+    var registered by remember { mutableStateOf(preferences.getInt("flow_version", 0) >= CurrentOnboardingVersion && (product == null || product.user != null)) }
     var step by rememberSaveable { mutableStateOf(StartupStep.Splash) }
     var nickname by rememberSaveable { mutableStateOf(preferences.getString("nickname", "") ?: "") }
     var phone by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
     var codeRequested by rememberSaveable { mutableStateOf(false) }
     var replaying by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(product?.user?.optString("id")) {
+        if (product != null && product.user == null && step == StartupStep.Home) {
+            registered = false; step = StartupStep.Phone
+        }
+    }
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
@@ -129,7 +138,17 @@ internal fun LookBuddyStartup(home: @Composable () -> Unit) {
                 StartupPage(visibleStep, nickname, phone, code, codeRequested,
                     onNickname = { nickname = it }, onPhone = { phone = it }, onCode = { code = it },
                     onRequestCode = { codeRequested = true },
-                    onNext = { if (visibleStep == step) advance() })
+                    onNext = {
+                        if (visibleStep == step && !loginBusy) {
+                            if (step == StartupStep.Phone && product != null && !replaying) {
+                                loginBusy = true
+                                loginScope.launch {
+                                    try { if (product.login(phone, nickname)) advance() }
+                                    finally { loginBusy = false }
+                                }
+                            } else advance()
+                        }
+                    })
             }
         }
         if (replaying) TextButton(onClick = {
@@ -191,12 +210,12 @@ internal fun StartupPage(
                         imeAction = ImeAction.Next)
                     Row(Modifier.fillMaxWidth().padding(start = 4.dp * scale),
                         horizontalArrangement = Arrangement.spacedBy(1.dp * scale)) {
-                        BuddyInput(code, onCode, "输入验证码", "code", scale,
+                        BuddyInput(code, onCode, if (LocalProduct.current != null) "演示登录无需验证码" else "输入验证码", "code", scale,
                             Modifier.weight(1f), imeAction = ImeAction.Done, onDone = dismissKeyboard)
-                        BuddyButton(if (codeRequested) "已获取" else "获取\n验证码", scale,
+                        BuddyButton(if (LocalProduct.current != null) "无需\n短信" else if (codeRequested) "已获取" else "获取\n验证码", scale,
                             Modifier.width(91.dp * scale), fontSize = 15f, tag = "request_code", onClick = onRequestCode)
                     }
-                    BuddyButton("登陆", scale, Modifier.fillMaxWidth().offset(x = 4.dp * scale),
+                    BuddyButton(if (LocalProduct.current != null) "演示登录" else "登陆", scale, Modifier.fillMaxWidth().offset(x = 4.dp * scale),
                         tag = "next", onClick = onNext)
                     if (codeRequested) Text("演示模式：任意验证码均可继续", color = BuddyClay,
                         fontSize = (13f * scale).sp, textAlign = TextAlign.Center,
