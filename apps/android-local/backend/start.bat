@@ -1,8 +1,15 @@
 @echo off
 chcp 65001 >nul 2>&1
-title LookBuddy 关心语后端
+set PYTHONUTF8=1
+title LookBuddy Backend
 cd /d "%~dp0"
-echo 正在启动 LookBuddy 关心语后端...
-echo.
-python app.py
-pause
+if exist ".venv\Scripts\python.exe" (
+    ".venv\Scripts\python.exe" app.py %*
+) else (
+    python app.py %*
+)
+if errorlevel 1 (
+    echo.
+    echo Startup failed. Install dependencies as described in README.md.
+    pause
+)

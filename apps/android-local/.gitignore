@@ -23,3 +23,17 @@ local.properties
 /桌面宠物/LookBuddy_Desktop/dist/
 /桌面宠物/LookBuddy_Desktop/artifacts/
 
+
+# Full backend local environment, tests and backups
+/backend/.venv/
+/backend/.pytest_cache/
+/backend/.coverage*
+/backend/htmlcov/
+/backend/**/__pycache__/
+/backend/**/*.py[cod]
+/backend/*.db
+/backend/*.db-*
+/backend/*.sqlite*
+/backend/.env.*
+!/backend/.env.example
+/backend-backups/

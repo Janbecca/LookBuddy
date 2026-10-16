@@ -1,135 +1,79 @@
-# LookBuddy 关心语后端
+# LookBuddy 本地完整后端
 
-轻量本地后端，为 Android 端提供 GLM 关心语生成接口。
+主实现来自 `Janbecca/LookBuddy` 的 `apps/backend`，固定下载源提交为
+`69622817b38c1ebdf7af846cd8fab9e9826f164f`。`src/`、上游测试、
+`pyproject.toml`、`uv.lock`、Dockerfile 和数据库备份工具保持该提交原样。
 
-## 特点
+原本地后端只有 GLM 问候语与模拟天气；现在改为运行上游 FastAPI 服务，包含账号、
+设备与工作会话、事件、提醒与调度、表情观察、策略学习、日记、心情和首页数据接口。
+本地新增部分只负责启动、旧环境变量兼容和使用说明，不另写一套业务规则。
 
-- 仅使用 Python 标准库，无需 pip install
-- GLM Base URL / Model / API Key 均通过环境变量配置
-- 使用智谱开放平台标准 API（适用于自建应用），不使用 Coding Plan 专用额度
-- 后端校验 GLM 返回格式，失败时使用符合相同规则的固定兜底文案
+## 安装和启动（Windows）
 
-## 快速开始
-
-### 1. 配置环境变量
-
-```powershell
-cd backend
-copy .env.example .env
-```
-
-用文本编辑器打开 `.env`，填入：
-
-```
-GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
-GLM_MODEL=glm-4-flash
-GLM_API_KEY=你的API Key
-PORT=5210
-```
-
-> API Key 从 https://open.bigmodel.cn/ → 管理控制台 → API Keys 获取。
-
-### 2. 启动后端
+需要 Python 3.11 或 3.12。首次在当前目录执行：
 
 ```powershell
-python app.py
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+Copy-Item .env.example .env
+.\.venv\Scripts\python.exe app.py
 ```
 
-或双击 `start.bat`。
+已有 `.env` 时请保留原文件，不执行覆盖复制。完成安装后也可双击 `start.bat`。
+默认监听 `0.0.0.0:5210`，沿用原来的局域网联调端口；只在本机调试可执行
+`python app.py --host 127.0.0.1`。`--port` 可覆盖端口，`--no-env` 完全跳过 `.env`。
 
-启动后会显示：
+- 健康检查：`http://127.0.0.1:5210/health`
+- 就绪检查：`http://127.0.0.1:5210/health/ready`
+- 交互接口文档：`http://127.0.0.1:5210/docs`
 
-```
-====================================================
-  LookBuddy 关心语后端
-====================================================
-  本机:     http://127.0.0.1:5210
-  局域网:   http://192.168.x.x:5210      ← 记下这个 IP
-  模型:     glm-4-flash
-  API Key:  已设置
-  天气来源: 模拟（Phase 1）
-  场景:     morning_seated, morning_unknown, evening_rain
-====================================================
-```
+`app.py` 总是从本目录读取 `.env`，SQLite 相对路径也固定相对本目录。
+默认数据库为 `lookbuddy.db`，不会上传到 GitHub；不要用真实数据库运行测试。
+`pyproject.toml` 是依赖主来源，`requirements.txt` 只引用当前工程。
+使用 uv 时可执行 `uv sync --frozen`，随后 `uv run python app.py`。
 
-### 3. 验证
+## 原有配置怎样保留
 
-浏览器打开 http://127.0.0.1:5210/health ，确认服务正常。
+`python app.py` 支持旧 `GLM_BASE_URL`、`GLM_MODEL`、`GLM_API_KEY`，分别映射为
+`LOOKBUDDY_GREETING_BASE_URL`、`LOOKBUDDY_GREETING_MODEL`、`LOOKBUDDY_GREETING_API_KEY`。
+新名称显式存在时优先使用新名称；系统环境变量优先于 `.env`。代码、日志及同步记录不保存真实密钥。
+日记模型使用独立的 `LOOKBUDDY_ROUTER_*` 配置，不自动共用问候模型。
+直接运行 `uvicorn lookbuddy.main:app --app-dir src` 时只支持上游 `LOOKBUDDY_*` 配置。
 
-测试关心语接口：
+## 与旧 App 的联调边界
 
-```powershell
-curl -X POST http://127.0.0.1:5210/buddy/greeting `
-  -H "Content-Type: application/json" `
-  -d '{\"scene\":\"morning_seated\"}'
-```
+`/buddy/greeting` 路径仍然存在，但与上游一致，需要登录后的
+`Authorization: Bearer <accessToken>`。注册使用 `/v1/auth/register`，登录使用
+`/v1/auth/login`；旧 App 只发 scene、不带登录令牌的请求会返回 401。
+本次只合并后端，没有修改 Android 登录或首页请求，也没有绕过身份校验。
 
-返回示例：
+天气当前为 `unavailable`：早间普通问候，`evening_rain` 不展示。
+原来的模拟深圳 26 度和雨天内容只保留于本地旧文件备份，不进入运行服务。
+五类提醒仍以感知端上传的数据为条件，下载本服务不等于手机已经接通提醒。
+上游 eufy 来源的表情入库/动作验证限制也未在本次下载中改动。
 
-```json
-{
-  "show": true,
-  "message": "今天气温约26度，坐下来慢慢进入工作状态就好，不用急，我陪你。",
-  "source": "glm",
-  "scene_label": "模拟·早间已落座",
-  "weather_source": "mock"
-}
-```
+## 后续修改入口
 
-- `"source": "glm"` — GLM 真实生成
-- `"source": "fallback"` — GLM 失败，使用兜底文案
-
-## API
-
-### POST /buddy/greeting
-
-请求：
-
-```json
-{
-  "scene": "morning_seated",
-  "recent_message": ""
-}
-```
-
-场景说明：
-
-| scene | 说明 |
+| 需求 | 文件 |
 | --- | --- |
-| `morning_seated` | 模拟·早间已落座 |
-| `morning_unknown` | 模拟·早间状态未知 |
-| `evening_rain` | 模拟·下班前正在下雨 |
+| 提醒条件和固定话术 | `src/lookbuddy/reminder_policy.py` |
+| 表情分类与观察 | `src/lookbuddy/emotion_service.py` |
+| 问候生成及首页接口 | `src/lookbuddy/product.py` |
+| 问候 Prompt | `src/lookbuddy/greeting_prompt.py` |
+| 日记事实筛选和写作 | `src/lookbuddy/diary_service.py` |
+| 动作验证、策略、延后任务 | `action_service.py`、`learning.py`、`scheduler.py`（均在 src/lookbuddy 内） |
+| API 路由和字段 | `src/lookbuddy/api.py`、`src/lookbuddy/schemas.py` |
 
-响应：
+## 验证与同步
 
-```json
-{
-  "show": true,
-  "message": "关心语文案",
-  "source": "glm",
-  "scene_label": "模拟·早间已落座",
-  "weather_source": "mock"
-}
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-### GET /health
+上游完整测试和本地启动兼容测试使用测试数据库。不要在另一个测试实例或同名测试数据库使用期间运行。
+Dockerfile 保持上游设计，使用内部 8080 端口，需要按上游部署环境变量配置，不使用本地 `app.py`。
 
-健康检查，返回服务状态和配置信息。
-
-## 当前状态
-
-| 项目 | 状态 |
-| --- | --- |
-| 后端服务 | ✅ 已实现 |
-| GLM 调用 | ✅ 标准接口，需配置 API Key |
-| 返回格式校验 | ✅ 已实现 |
-| 兜底文案 | ✅ 已实现 |
-| 天气数据 | 🔶 模拟（Phase 1） |
-| 时间规则 | 🔶 模拟场景标注 |
-
-## 文件
-
-- `app.py` — 后端主程序
-- `.env.example` — 环境变量模板
-- `start.bat` — Windows 一键启动
-- `requirements.txt` — 无第三方依赖说明
+本目录对应实际工程 `D:/Everything/Anker/projects/lookbuddy/backend`。
+根据项目约定，合并后的本地版本同步到 `codex/android-local-sync` 的
+`apps/android-local/backend`；下载来源仍是 `main` 的 `apps/backend`。
+不覆盖 `main`，不混合两套 Android 实现。详情见 `MERGE.md`。

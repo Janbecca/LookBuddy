@@ -3,7 +3,7 @@
 - 每次 LookBuddy 代码改动，必须同时更新本地工程与 `https://github.com/Janbecca/LookBuddy`，报告分支和完整提交号。仅本地修改或仅远端修改都不能称为已同步。
 - 实际运行工程为 `D:/Everything/Anker/projects/lookbuddy`。工作区其他 LookBuddy 目录及 output 下副本仅作历史资料或临时工作文件，不能默认为最新代码。
 - 对应远端目录为 `apps/android-local`，保留 `apps/android` 的独立实现，不混合两套代码。
-- 同步分支为 `codex/android-local-sync`。PR #2 已于2026-10-16合并。main 另有后端集成更新，与此分支及 D 盘工程尚未合并，不能直接覆盖；本次素材改动仍同步约定分支，不代表 main 已更新。
+- 同步分支为 `codex/android-local-sync`。PR #2 已于2026-10-16合并。main 的 Android 集成更新尚未合并到 D 盘 App，不能直接覆盖；后端已按下述记录单独合入，本地变更仍同步约定分支，不代表 main 已更新。
 - 修改前先读远端分支当前提交，逐文件核对本地与远端 Git blob SHA，保留双方改动；存在冲突时先处理，不能直接覆盖。
 - 当前通过已授权 GitHub 连接器同步；本工程无 `.git`，不能假定命令行 pull/push 或后台自动同步可用。
 - 验证通过后创建提交，使用期望分支 SHA 更新分支，防止覆盖并发改动；不强制推送。提交后逐文件比较 Git blob SHA，并更新工作区同步记录。
@@ -17,3 +17,5 @@
 - 首页办公动画由 LookBuddyApp 上层 WorkBuddyPlayback 调度：每次进入前台重播一遍，前台每3600000ms重播，末帧保持；切 Tab 不重置已完成状态。日记动画位于轮播外，页面每次进入仅播一遍，翻气泡不重播。心情选择为六张资产图，旧 Tired 记录保留。
 
 - 1.5 首页提醒以 Figma 315:4093 为准；“知道了”必须在近圆形48%白色气泡内部。HomeReminderController 在 Tab 上层保存状态，HomeReminderSource 是未来后端入口；已确认ID去重，动画结束不自动关闭，统计面板展开暂时隐藏浮层。缺少的姿态/起身/开心/担忧完整动作暂为明确记录的占位，后续统一替换 HomeReminder.kt 中 ReminderArtwork。
+
+- 2026-10-16 后端合并：实际 backend 以 main@69622817b38c1ebdf7af846cd8fab9e9826f164f 的 apps/backend 为主，完整导入38个上游文件并保持业务源码与测试原样；本地启动兼容 python app.py/start.bat、5210端口及旧GLM_*环境变量。合并结果对应远端 apps/android-local/backend，旧5文件保存在本地 backend-backups（不提交）；.env/数据库/虚拟环境不提交。GitHub问候接口要求Bearer登录，旧App无令牌请求仍需后续接入；本次没有修改Android页面或绕过鉴权。86项测试和隔离HTTP验证通过。后端后续修改 src/lookbuddy；继续按约定分支同步，具体提交号以工作区同步记录为准。
