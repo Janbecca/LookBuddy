@@ -21,6 +21,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 internal val CompanionPaper = Color(0xFFFEFBF6)
 internal val CompanionInk = Color(0xFF40362B)
@@ -30,27 +35,55 @@ internal val CompanionClay = Color(0xFFA86843)
 
 internal enum class CompanionPage { Home, Diary, Settings, Camera }
 
-/** One injectable camera boundary; page code never depends on a camera vendor or transport. */
+/** Camera and reminder transports stay injectable; the production reminder source is unconnected. */
 @Composable
 internal fun LookBuddyApp(
     initialPage: CompanionPage = CompanionPage.Home,
-    cameraFeed: CameraFeed? = null
+    cameraFeed: CameraFeed? = null,
+    reminderSource: HomeReminderSource? = null
 ) {
     var page by rememberSaveable { mutableStateOf(initialPage) }
     val defaultCamera = remember { UnconnectedCameraFeed() }
     val camera = cameraFeed ?: defaultCamera
+    val reminders = rememberHomeReminderController()
+    val chat = rememberBuddyChatState()
+    var showChat by rememberSaveable { mutableStateOf(false) }
+    val openChat: (String?) -> Unit = { opening -> chat.enter(opening); showChat = true }
+    val owner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(reminderSource, owner) {
+        owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            reminderSource?.reminders?.collect { reminders.receive(it) }
+        }
+    }
+    val acknowledge: (String) -> Unit = { id ->
+        scope.launch {
+            try { reminderSource?.acknowledge(id) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { android.util.Log.d("HomeReminder", "Reminder acknowledgement unavailable") }
+        }
+    }
     val savedPages = rememberSaveableStateHolder()
-    BackHandler(page != CompanionPage.Home) { page = CompanionPage.Home }
-    savedPages.SaveableStateProvider(page.name) {
-        when (page) {
-            CompanionPage.Home -> MorningHomeScreen(onCamera = { page = CompanionPage.Camera },
-                onDiary = { page = CompanionPage.Diary }, onSettings = { page = CompanionPage.Settings })
-            else -> CompanionPageLayout(page, onPage = { page = it }) { s ->
-                when (page) {
-                    CompanionPage.Diary -> DiaryScreen(s)
-                    CompanionPage.Camera -> CameraScreen(camera, s)
-                    CompanionPage.Settings -> PersonalSettingsScreen(s, onCamera = { page = CompanionPage.Camera })
-                    else -> Unit
+    val workPlayback = rememberWorkBuddyPlayback()
+    BackHandler(showChat || page != CompanionPage.Home) {
+        if (showChat) showChat = false else page = CompanionPage.Home
+    }
+    CompositionLocalProvider(LocalWorkPlayback provides workPlayback) {
+        if (showChat) {
+            BuddyChatScreen(chat, onPage = { showChat = false; page = it })
+        } else savedPages.SaveableStateProvider(page.name) {
+            when (page) {
+                CompanionPage.Home -> MorningHomeScreen(onCamera = { page = CompanionPage.Camera },
+                    onDiary = { page = CompanionPage.Diary }, onSettings = { page = CompanionPage.Settings },
+                    reminders = reminders, onReminderAcknowledged = acknowledge,
+                    onReminderChat = { event -> openChat(event.message) })
+                else -> CompanionPageLayout(page, onPage = { page = it }) { s ->
+                    when (page) {
+                        CompanionPage.Diary -> DiaryScreen(s, onChat = { openChat("今天有什么想和我说说的吗？") })
+                        CompanionPage.Camera -> CameraScreen(camera, s)
+                        CompanionPage.Settings -> PersonalSettingsScreen(s, onCamera = { page = CompanionPage.Camera })
+                        else -> Unit
+                    }
                 }
             }
         }

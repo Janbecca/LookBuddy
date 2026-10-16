@@ -47,6 +47,26 @@ class LiveTimeUiTest {
 @LooperMode(LooperMode.Mode.PAUSED)
 class CompactFortuneLayoutTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun homeReminderArtworkFitsAboveDrawerAtLargeFont() {
+        val controller = HomeReminderController().apply { preview(HomeReminderKind.Drink) }
+        compose.setContent {
+            CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(1f, 1.5f),
+                LocalBuddyMotionEnabled provides false
+            ) {
+                MorningHomeScreen(previewTime = LocalDateTime.of(2026, 10, 17, 10, 0), reminders = controller)
+            }
+        }
+        val artwork = compose.onNodeWithTag("reminder_visible_artwork").fetchSemanticsNode().boundsInRoot
+        val drawer = compose.onNodeWithTag("statistics_sheet").fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue("Reminder artwork must fit above the drawer", artwork.bottom <= drawer.top + 1f)
+        org.junit.Assert.assertTrue("Reminder artwork stays inside the narrow screen", artwork.left >= 0 && artwork.right <= 320f)
+        compose.onNodeWithTag("acknowledge_reminder").assertIsDisplayed()
+        compose.onNodeWithTag("nav_camera").assertIsDisplayed()
+        compose.onNodeWithTag("home_companion_quote").assertDoesNotExist()
+    }
+
     @Test fun sevenMoodDaysAreVisibleAtLargeFont() {
         val today = LocalDate.of(2026, 10, 16)
         compose.setContent {

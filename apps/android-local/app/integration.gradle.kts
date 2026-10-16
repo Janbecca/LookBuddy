@@ -1,4 +1,5 @@
 import java.nio.file.Files
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -6,6 +7,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
+
+val desktopProperties = Properties().apply {
+    val source = project.file("../local.properties")
+    if (source.isFile) source.inputStream().use { load(it) }
+}
+fun desktopConfigString(value: String): String = "\"" + value.replace("\\", "\\\\")
+    .replace("\"", "\\\"").replace("\r", "\\r").replace("\n", "\\n") + "\""
+val desktopUrl = providers.environmentVariable("LOOKBUDDY_DESKTOP_URL")
+    .orElse(desktopProperties.getProperty("lookbuddy.desktop.url", ""))
+val desktopToken = providers.environmentVariable("LOOKBUDDY_DESKTOP_TOKEN")
+    .orElse(desktopProperties.getProperty("lookbuddy.desktop.token", ""))
 
 android {
     namespace = "com.lookbuddy.app"
@@ -18,6 +30,10 @@ android {
         targetSdk = 36
         versionCode = 10
         versionName = "1.4.0-unified"
+
+        // Optional pairing is debug-only; release keeps the bridge disabled.
+        buildConfigField("String", "LOOKBUDDY_DESKTOP_URL", "\"\"")
+        buildConfigField("String", "LOOKBUDDY_DESKTOP_TOKEN", "\"\"")
     }
 
     buildFeatures {
@@ -27,6 +43,8 @@ android {
 
     buildTypes {
         debug {
+            buildConfigField("String", "LOOKBUDDY_DESKTOP_URL", desktopConfigString(desktopUrl.get()))
+            buildConfigField("String", "LOOKBUDDY_DESKTOP_TOKEN", desktopConfigString(desktopToken.get()))
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/\"")
         }
         release {
@@ -140,6 +158,7 @@ tasks.withType<Test>().configureEach {
     // A different integration backend must never reuse an earlier skipped result.
     inputs.property("lookbuddyIntegrationBaseUrl", providers.environmentVariable("LOOKBUDDY_ANDROID_INTEGRATION_BASE_URL").orElse(""))
     inputs.property("productIntegrationBaseUrl", providers.environmentVariable("LOOKBUDDY_PRODUCT_INTEGRATION_BASE_URL").orElse(""))
+    inputs.property("desktopIntegrationBaseUrl", providers.environmentVariable("LOOKBUDDY_DESKTOP_INTEGRATION_BASE_URL").orElse(""))
     doFirst {
         if (System.getProperty("os.name").startsWith("Windows") && classpath.files.any { file -> file.absolutePath.any { it.code > 127 } }) {
             val stage = Files.createTempDirectory("lookbuddy-jvm-").toFile()

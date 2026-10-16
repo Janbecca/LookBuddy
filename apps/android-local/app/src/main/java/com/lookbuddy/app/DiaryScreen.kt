@@ -12,6 +12,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,6 +33,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -39,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import org.json.JSONObject
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -58,7 +62,7 @@ internal val DiaryExampleEntries = listOf(
 )
 
 @Composable
-internal fun DiaryScreen(s: Float) {
+internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}) {
     val product = LocalProduct.current
     val today = rememberAppTime().toLocalDate()
     var dateText by rememberSaveable { mutableStateOf<String?>(null) }
@@ -69,18 +73,58 @@ internal fun DiaryScreen(s: Float) {
     val context = LocalContext.current
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
-    var page by remember(date) { mutableStateOf<org.json.JSONObject?>(null) }
-    var loadError by remember(date) { mutableStateOf<String?>(null) }
-    var editing by remember(date) { mutableStateOf(false) }
-    var edited by remember(date) { mutableStateOf("") }
-    var confirmDelete by remember { mutableStateOf(false) }
-    suspend fun reload() {
-        try { page = org.json.JSONObject(product!!.request("/v1/diary-page/$date")); loadError = null }
-        catch (e: kotlinx.coroutines.CancellationException) { throw e }
-        catch (_: Exception) { loadError = "日记读取失败，请重试" }
+    val accountId = product?.user?.optString("id")
+    var page by remember(date, accountId) { mutableStateOf<JSONObject?>(null) }
+    var loadError by remember(date, accountId) { mutableStateOf<String?>(null) }
+    var loading by remember(date, accountId) { mutableStateOf(false) }
+    var actionError by remember(date, accountId) { mutableStateOf<String?>(null) }
+    var editing by remember(date, accountId) { mutableStateOf(false) }
+    var edited by remember(date, accountId) { mutableStateOf("") }
+    var confirmDelete by remember(date, accountId) { mutableStateOf(false) }
+    suspend fun reload(): Boolean {
+        loading = true
+        return try {
+            page = JSONObject(product!!.request("/v1/diary-page/$date")); loadError = null; true
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { loadError = "日记读取失败，请重试"; false }
+        finally { loading = false }
     }
-    LaunchedEffect(date, product?.user?.optString("id")) { if (product != null) reload() }
+    suspend fun write(method: String, path: String, body: JSONObject? = null): Boolean {
+        actionError = null
+        return try {
+            product!!.request(path, method, body)
+            if (reload()) true else {
+                actionError = "操作已提交，读取最新日记失败，请刷新核对"; false
+            }
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { actionError = "日记操作失败，请重试"; false }
+    }
+    LaunchedEffect(date, accountId, showExample) { if (product != null && !showExample) reload() }
     LaunchedEffect(date) { scroll.scrollTo(0) }
+    val content = page?.takeUnless { it.isNull("content") }?.optString("content").orEmpty()
+    val entries = page?.optJSONArray("entries")
+    val empty = content.isBlank() && (entries == null || entries.length() == 0)
+    val busy = product?.busy == true || loading
+    if (editing) {
+        androidx.activity.compose.BackHandler { if (!busy) editing = false }
+        Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())
+            .background(CompanionPaper).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("编辑日记", color = CompanionInk, fontSize = 20.sp)
+            BasicTextField(edited, { edited = it }, enabled = !busy,
+                textStyle = TextStyle(color = CompanionInk, fontSize = 16.sp, lineHeight = 24.sp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 240.dp)
+                    .border(1.dp, CompanionBorder, RoundedCornerShape(12.dp)).padding(12.dp).testTag("diary_editor"))
+            actionError?.let { Text(it, color = CompanionClay, modifier = Modifier.testTag("diary_edit_error")) }
+            Row(Modifier.align(Alignment.End)) {
+                TextButton(enabled = !busy, onClick = { editing = false }) { Text("取消") }
+                TextButton(enabled = !busy, modifier = Modifier.testTag("diary_save"), onClick = { product?.action {
+                    if (write("PATCH", "/v1/diaries/$date", JSONObject().put("content", edited))) editing = false
+                } }) { Text("保存") }
+            }
+        }
+        return
+    }
     Column(Modifier.fillMaxSize().testTag("diary_screen").verticalScroll(scroll)
         .padding(horizontal = 20.dp * s).padding(top = 10.dp * s, bottom = 28.dp * s),
         verticalArrangement = Arrangement.spacedBy(16.dp * s)) {
@@ -89,30 +133,10 @@ internal fun DiaryScreen(s: Float) {
             Text(date.format(DateTimeFormatter.ofPattern("M月d日 · E", Locale.CHINA)),
                 color = CompanionMuted, fontSize = (11 * s).sp)
         }
-        if (!showExample && product != null) {
-            Row {
-                TextButton(enabled = !product.busy, onClick = { product.action { product.request("/v1/diaries/$date/generate", "POST", org.json.JSONObject()); reload() } }) { Text("生成日记") }
-                TextButton(onClick = { edited = page?.optString("content").orEmpty(); editing = true }) { Text("编辑") }
-                TextButton(onClick = { confirmDelete = true }) { Text("删除正文") }
-                TextButton(onClick = { scope.launch { reload() } }) { Text("刷新") }
-            }
-            loadError?.let { Text(it, color = CompanionClay) }
-            page?.optString("content")?.takeIf { it.isNotBlank() }?.let { Text(it, color = CompanionInk) }
-            val entries = page?.optJSONArray("entries")
-            if (entries == null || entries.length() == 0) Text("这一天还没有记录", color = CompanionMuted)
-            else for (i in 0 until entries.length()) {
-                val entry = entries.getJSONObject(i)
-                Column(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(12.dp)).padding(16.dp)) {
-                    Text("${entry.getString("time")} · ${entry.getString("category")}", color = CompanionMuted)
-                    Text(entry.getString("title"), color = CompanionInk)
-                    Text(entry.optString("description"), color = CompanionMuted)
-                }
-            }
-        }
+        BuddyDiaryCarousel(s, showExample, onChat)
         if (showExample) {
             Text("设计稿示例 · 非真实时间记录", color = CompanionMuted, fontSize = 12.sp)
             TextButton(onClick = { example = false; dateText = null }) { Text("返回今天", color = CompanionClay) }
-            BuddyDiaryCarousel(s)
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -130,30 +154,56 @@ internal fun DiaryScreen(s: Float) {
                 FigmaSvg("diary_calendar", s, folder = "pages")
             }
         }
+        if (!showExample && product != null) {
+            Column {
+                Row(Modifier.fillMaxWidth()) {
+                    TextButton(enabled = !busy, modifier = Modifier.weight(1f).testTag("diary_generate"),
+                        onClick = { product.action { write("POST", "/v1/diaries/$date/generate", JSONObject()) } }) { Text("生成日记") }
+                    TextButton(enabled = !busy, modifier = Modifier.weight(1f).testTag("diary_refresh"),
+                        onClick = { scope.launch { reload() } }) { Text("刷新") }
+                }
+                Row(Modifier.fillMaxWidth()) {
+                    TextButton(enabled = !busy && page != null, modifier = Modifier.weight(1f).testTag("diary_edit"),
+                        onClick = { edited = content; actionError = null; editing = true }) { Text("编辑") }
+                    TextButton(enabled = !busy && content.isNotBlank(), modifier = Modifier.weight(1f).testTag("diary_delete"),
+                        onClick = { actionError = null; confirmDelete = true }) { Text("删除正文") }
+                }
+            }
+            if (busy) Text("日记同步中…", color = CompanionMuted, modifier = Modifier.testTag("diary_loading"))
+            loadError?.let { Text(it, color = CompanionClay, modifier = Modifier.testTag("diary_load_error")) }
+            actionError?.let { Text(it, color = CompanionClay, modifier = Modifier.testTag("diary_action_error")) }
+            if (loadError != null && page != null) Text("以下保留上次读取的内容", color = CompanionMuted, fontSize = 11.sp)
+            if (content.isNotBlank()) Text(content, color = CompanionInk,
+                modifier = Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(16.dp)).padding(16.dp)
+                    .testTag("diary_body"))
+            if (entries != null) for (i in 0 until entries.length()) {
+                DiaryRecordedEntry(entries.getJSONObject(i), i, s)
+            }
+        }
         if (showExample) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp * s)) {
                 DiaryExampleEntries.forEachIndexed { i, entry -> DiaryTimelineEntry(entry, i, s) { detail = entry } }
             }
             Text("示例日记 · 来自设计稿，后续接入真实记录", color = CompanionMuted, fontSize = (11 * s).sp)
-        } else if (product == null) {
-            Column(Modifier.fillMaxWidth().padding(vertical = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("这一天还没有记录", color = CompanionInk, fontSize = 18.sp)
-                Spacer(Modifier.height(12.dp))
-                Text("和 Buddy 一起，慢慢积攒日常的小事。", color = CompanionMuted, fontSize = 12.sp)
-                TextButton(onClick = { example = true }) { Text("看看示例日记", color = CompanionClay) }
+        } else {
+            if (product == null || (!busy && loadError == null && page != null && empty)) {
+                Column(Modifier.fillMaxWidth().padding(vertical = 32.dp).testTag("diary_empty"), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("这一天还没有记录", color = CompanionInk, fontSize = 18.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Text("和 Buddy 一起，慢慢积攒日常的小事。", color = CompanionMuted, fontSize = 12.sp)
+                }
             }
+            TextButton(onClick = { example = true }) { Text("看看示例日记", color = CompanionClay) }
         }
     }
-    if (editing) AlertDialog(onDismissRequest = { editing = false }, title = { Text("编辑日记") },
-        text = { androidx.compose.material3.OutlinedTextField(edited, { edited = it }) },
-        confirmButton = { TextButton(onClick = { product?.action {
-            product.request("/v1/diaries/$date", "PATCH", org.json.JSONObject().put("content", edited)); reload(); editing = false
-        } }) { Text("保存") } }, dismissButton = { TextButton(onClick = { editing = false }) { Text("取消") } })
     if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("删除这天的日记正文？") },
-        text = { Text("结构化时间线仍保留，之后可重新生成。") },
-        confirmButton = { TextButton(onClick = { product?.action {
-            product.request("/v1/diaries/$date", "DELETE"); reload(); confirmDelete = false
-        } }) { Text("确认删除") } }, dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } })
+        text = { Column {
+            Text("结构化时间线仍保留，之后可重新生成。")
+            actionError?.let { Text(it, color = CompanionClay, modifier = Modifier.testTag("diary_delete_error")) }
+        } },
+        confirmButton = { TextButton(enabled = !busy, modifier = Modifier.testTag("diary_confirm_delete"), onClick = { product?.action {
+            if (write("DELETE", "/v1/diaries/$date")) confirmDelete = false
+        } }) { Text("确认删除") } }, dismissButton = { TextButton(enabled = !busy, onClick = { confirmDelete = false }) { Text("取消") } })
     detail?.let { entry ->
         AlertDialog(onDismissRequest = { detail = null }, containerColor = CompanionPaper,
             title = { Text("${entry.time} · ${entry.title}", color = CompanionInk) },
@@ -166,10 +216,11 @@ internal fun DiaryScreen(s: Float) {
 }
 
 @Composable
-private fun BuddyDiaryCarousel(s: Float) {
+private fun BuddyDiaryCarousel(s: Float, example: Boolean, onChat: () -> Unit) {
     val pager = rememberPagerState(initialPage = 1, pageCount = { 3 })
     val fs = LocalDensity.current.fontScale.coerceAtLeast(1f)
-    val groups = listOf(
+    val primaryX = maxOf(87f, -13f + 88f * fs + 12f)
+    val groups = if (!example) List(3) { listOf("今天，也很高兴见到你。", "我在这里陪着你。", "记录的小事，会在这里慢慢积攒。") } else listOf(
         listOf("08:05，新的一天，你带着好心情来啦。", "10:10，又给自己补充了一点水分。", "你认真工作的时候，我就安静陪着你。"),
         listOf("17:23，你有点累了。我们一起伸展了一下。", "18:05，今天也辛苦啦，明天见！", "工位也被你收拾好了，今天的小事我都记着。"),
         listOf("13:57，吃饱啦，下午一起慢慢来。", "16:00，今天也有好好喝水。", "每一段小小的日常，都值得被记住。")
@@ -177,10 +228,8 @@ private fun BuddyDiaryCarousel(s: Float) {
     Box(Modifier.fillMaxWidth().height(223.dp * s * fs)) {
         VerticalPager(pager, Modifier.fillMaxSize().testTag("diary_bubbles")) { page ->
             Box(Modifier.fillMaxSize()) {
-                Image(painterResource(R.drawable.diary_buddy), "LookBuddy", Modifier.offset(x = (-13).dp * s, y = 74.dp * s * fs)
-                    .size(121.dp * s, 126.dp * s), contentScale = ContentScale.Crop)
-                DiaryBubble(groups[page][0], 13f, s, Modifier.offset(42.dp * s, 5.dp * s * fs)
-                    .width(279.dp * s).heightIn(min = 55.dp * s * fs))
+                DiaryBubble(groups[page][0], 13f, s, Modifier.offset(primaryX.dp * s, 5.dp * s * fs)
+                    .width((321f - primaryX).coerceAtLeast(150f).dp * s).heightIn(min = 55.dp * s * fs))
                 DiaryBubble(groups[page][1], 12f, s, Modifier.offset(113.dp * s, 74.dp * s * fs)
                     .width(216.dp * s).heightIn(min = 28.dp * s * fs), soft = true)
                 DiaryBubble(groups[page][2], 12f, s, Modifier.offset(121.dp * s, 120.dp * s * fs)
@@ -189,10 +238,39 @@ private fun BuddyDiaryCarousel(s: Float) {
                     modifier = Modifier.offset(184.dp * s, 183.dp * s * fs))
             }
         }
+        Box(Modifier.offset(x = (-13).dp * s, y = 27.dp * s * fs)
+            .size(88.dp * s * fs, maxOf(44.dp, 44.dp * s * fs))
+            .clickable(role = Role.Button, onClick = onChat).testTag("diary_chat_entry"), contentAlignment = Alignment.Center) {
+            FigmaSvg("diary_chat_entry", s * fs, folder = "chat")
+            Text("和我聊一聊", color = Color(0xFF38291F), fontFamily = OnboardingDeviceFont,
+                fontSize = (14 * s).sp, lineHeight = (22 * s).sp, modifier = Modifier.offset(y = (-3).dp * s))
+        }
+        BuddyWebpOnce(BuddyClip.Introduction, Modifier.offset(x = (-13).dp * s, y = 74.dp * s * fs)
+            .size(121.dp * s, 126.dp * s), "LookBuddy 欢迎你翻开日记")
         Column(Modifier.align(Alignment.TopEnd).padding(top = 59.dp * s * fs, end = 9.dp * s),
             verticalArrangement = Arrangement.spacedBy(5.dp * s)) {
             repeat(3) { index -> Box(Modifier.size(5.dp * s, (if (index == pager.currentPage) 12 else 5).dp * s)
                 .background(if (index == pager.currentPage) CompanionClay else CompanionBorder, RoundedCornerShape(5.dp))) }
+        }
+    }
+}
+
+/** Recorded events share the timeline style without borrowing example keyframes or video. */
+@Composable
+private fun DiaryRecordedEntry(entry: JSONObject, index: Int, s: Float) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 106.dp * s).testTag("diary_record_$index"),
+        horizontalArrangement = Arrangement.spacedBy(10.dp * s)) {
+        Text(entry.optString("time"), color = CompanionMuted, fontSize = (11 * s).sp,
+            modifier = Modifier.width(45.dp * s))
+        Box(Modifier.width(14.dp * s).height(106.dp * s)) { FigmaSvg("timeline", s, folder = "pages") }
+        Column(Modifier.weight(1f).heightIn(min = 106.dp * s).background(Color.White, RoundedCornerShape(16.dp))
+            .border(.75.dp, CompanionBorder.copy(alpha = .55f), RoundedCornerShape(16.dp)).padding(12.dp * s),
+            verticalArrangement = Arrangement.spacedBy(4.dp * s)) {
+            Text(entry.optString("title"), color = CompanionInk, fontSize = (14 * s).sp)
+            entry.optString("description").takeIf { it.isNotBlank() }?.let {
+                Text(it, color = CompanionMuted, fontSize = (10 * s).sp)
+            }
+            Text(entry.optString("category"), color = CompanionClay, fontSize = (9 * s).sp)
         }
     }
 }

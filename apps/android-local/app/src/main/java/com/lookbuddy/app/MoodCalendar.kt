@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
@@ -48,9 +49,19 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-internal enum class Mood(val label: String, val asset: String) {
-    Happy("开心", "happy"), Calm("平静", "calm"), Tired("有点累", "tired"), Sad("低落", "sad")
+internal enum class Mood(val label: String, val asset: String, val image: Int? = null) {
+    Happy("开心", "happy", R.drawable.mood_happy), Calm("平静", "calm", R.drawable.mood_calm),
+    Tired("有点累", "tired"), Sad("低落", "sad", R.drawable.mood_sad)
 }
+
+/** Visual choices without a Mood are not part of the persisted/API contract. */
+private data class MoodChoice(val key: String, val label: String, val mood: Mood? = null, val image: Int? = mood?.image)
+private val MoodChoices = listOf(Mood.Happy, Mood.Calm, Mood.Sad).map { MoodChoice(it.name, it.label, it) } + listOf(
+    MoodChoice("Curious", "好奇", image = R.drawable.mood_curious),
+    MoodChoice("Thoughtful", "思考", image = R.drawable.mood_thinking),
+    MoodChoice("Excited", "振奋", image = R.drawable.mood_excited),
+    MoodChoice(Mood.Tired.name, Mood.Tired.label, Mood.Tired)
+)
 
 /** One record per local calendar date. Editing a mood never redraws the daily fortune. */
 internal class MoodStore(context: Context) {
@@ -80,7 +91,10 @@ internal fun MorningHomeScreen(
     onCamera: () -> Unit = {},
     onDiary: () -> Unit = {},
     onSettings: () -> Unit = {},
-    previewTime: java.time.LocalDateTime? = null
+    previewTime: java.time.LocalDateTime? = null,
+    reminders: HomeReminderController? = null,
+    onReminderAcknowledged: (String) -> Unit = {},
+    onReminderChat: (HomeReminderEvent) -> Unit = {}
 ) {
     val context = LocalContext.current
     val store = remember(context) { MoodStore(context) }
@@ -99,7 +113,8 @@ internal fun MorningHomeScreen(
                 onCamera = onCamera, onDiary = onDiary, onSettings = onSettings, onCalendar = {
                 records = previewRecords ?: product?.moods ?: store.week(date)
                 open = true
-            }, now = now)
+            }, now = now, reminders = reminders, onReminderAcknowledged = onReminderAcknowledged,
+                onReminderChat = onReminderChat, desktopSyncVisible = !open)
         }
         if (open) key(date) {
             val recordDate = date
@@ -124,6 +139,7 @@ internal fun MoodCalendar(
     var pending by remember { mutableStateOf<Mood?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf(false) }
+    var unconnected by remember { mutableStateOf<String?>(null) }
     val rotation = remember { Animatable(0f) }
     val alpha = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
@@ -160,14 +176,22 @@ internal fun MoodCalendar(
                         Text("不管什么心情，都可以放在这里", color = CalendarMuted, fontSize = (12 * s).sp,
                             lineHeight = (18 * s).sp, textAlign = TextAlign.Center)
                         Spacer(Modifier.height(8.dp * s))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Mood.entries.forEach { mood ->
-                                val selected = pending == mood
-                                Column(Modifier.size(53.dp * s, 72.dp * s)
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp * s)) {
+                        MoodChoices.chunked(3).forEach { choices ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp * s)) {
+                            choices.forEach { choice ->
+                                val selected = pending != null && pending == choice.mood
+                                Column(Modifier.weight(1f).heightIn(min = 94.dp * s)
                                     .graphicsLayer { scaleX = if (selected) 1.04f else 1f; scaleY = scaleX }
                                     .background(if (selected) Color(0xFFF7EDDE) else Color.Transparent, RoundedCornerShape(10.dp * s))
                                     .border(.6.dp, CalendarBorder, RoundedCornerShape(10.dp * s))
                                     .clickable(enabled = !busy, role = Role.RadioButton) {
+                                        val mood = choice.mood
+                                        if (mood == null) {
+                                            unconnected = "${choice.label}暂未接入，不会保存记录"
+                                            return@clickable
+                                        }
+                                        unconnected = null
                                         busy = true; pending = mood; error = false
                                         scope.launch {
                                             // Let the selected state settle before persisting and turning the card.
@@ -185,14 +209,21 @@ internal fun MoodCalendar(
                                             } else error = true
                                             pending = null; busy = false
                                         }
-                                    }.testTag("mood_${mood.name}"),
+                                    }.semantics { this.selected = selected }.testTag("mood_${choice.key}"),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(6.dp * s, Alignment.CenterVertically)) {
-                                    MoodIcon(mood, s)
-                                    Text(mood.label, color = CalendarInk, fontSize = (11 * s).sp, lineHeight = (16 * s).sp)
+                                    if (choice.mood != null) MoodIcon(choice.mood, s)
+                                    else androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(choice.image!!), choice.label,
+                                        Modifier.size(48.dp * s), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+                                    Text(choice.label, color = CalendarInk, fontSize = (11 * s).sp, lineHeight = (16 * s).sp)
                                 }
                             }
+                            repeat(3 - choices.size) { Spacer(Modifier.weight(1f)) }
                         }
+                        }
+                        }
+                        unconnected?.let { Text(it, color = Color(0xFFA85E3D), fontSize = (11 * s).sp,
+                            modifier = Modifier.testTag("mood_unconnected").semantics { liveRegion = LiveRegionMode.Polite }) }
                         if (error) Text("刚刚没记住，再轻点一次好吗？", color = Color(0xFFA85E3D),
                             fontSize = (10 * s).sp, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                     } else {
@@ -239,7 +270,13 @@ private fun CalendarDate(date: LocalDate, s: Float) {
 }
 
 @Composable
-internal fun MoodIcon(mood: Mood, s: Float) = FigmaSvg(mood.asset, s, folder = "companion")
+internal fun MoodIcon(mood: Mood, s: Float, size: Float = 48f) {
+    if (mood.image != null) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(mood.image), mood.label,
+        Modifier.size((size * s).dp), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+    else Box(Modifier.size((size * s).dp), contentAlignment = Alignment.Center) {
+        FigmaSvg(mood.asset, s * size / 26f, folder = "companion")
+    }
+}
 
 @Composable
 private fun CalendarWeek(date: LocalDate, records: Map<LocalDate, Mood>, s: Float) {
@@ -265,7 +302,7 @@ private fun CalendarWeek(date: LocalDate, records: Map<LocalDate, Mood>, s: Floa
                     Text(day.dayOfMonth.toString().padStart(2, '0'), color = if (today) Color(0xFFA66E42) else CalendarInk,
                         fontSize = (11 * s).sp, lineHeight = (15 * s).sp)
                     if (mood != null) Box(Modifier.graphicsLayer { alpha = if (today) 1f else .45f }) {
-                        MoodIcon(mood, s * 21f / 26f)
+                        MoodIcon(mood, s, size = 21f)
                     } else Text("·", color = CalendarMuted, fontSize = (18 * s).sp, lineHeight = (27 * s).sp)
                 }
             }

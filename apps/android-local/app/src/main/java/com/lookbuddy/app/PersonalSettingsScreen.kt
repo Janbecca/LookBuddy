@@ -149,7 +149,8 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
             text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when (selected) {
                     "账号安全" -> {
-                        Text("演示身份 · 用户名未验证。数据按此设备隔离。${product?.user?.optString("phoneMasked").orEmpty()}", color = CompanionMuted)
+                        Text(if (product != null) "演示用户名：${product.username} · 未验证。数据按账号隔离。"
+                            else "设计预览 · 尚未连接账号。", color = CompanionMuted)
                         TextButton(onClick = { product?.logout(); dialog = null }) { Text("退出登录") }
                         TextButton(onClick = { dialog = "删除账号" }) { Text("删除演示账号和云端数据") }
                     }

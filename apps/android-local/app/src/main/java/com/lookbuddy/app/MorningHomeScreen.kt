@@ -58,6 +58,8 @@ import com.caverock.androidsvg.RenderOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import org.json.JSONObject
 import kotlin.math.abs
 
 private val HomeInk = Color(0xFF38291F)
@@ -110,16 +112,42 @@ internal fun MorningHomeContent(
     onDiary: () -> Unit = {},
     onSettings: () -> Unit = {},
     now: java.time.LocalDateTime = rememberAppTime(),
-    schedule: WorkSchedule = rememberWorkSchedule()
+    schedule: WorkSchedule? = null,
+    reminders: HomeReminderController? = null,
+    onReminderAcknowledged: (String) -> Unit = {},
+    onReminderChat: (HomeReminderEvent) -> Unit = {},
+    desktopSyncVisible: Boolean = true
 ) {
     var expanded by rememberSaveable { mutableStateOf(initialExpanded) }
-    val status = schedule.status(now)
+    val workPlayback = LocalWorkPlayback.current ?: rememberWorkBuddyPlayback()
+    val controller = reminders ?: rememberHomeReminderController()
+    var previewOpen by rememberSaveable { mutableStateOf(false) }
     val product = LocalProduct.current
+    val accountId = product?.user?.optString("id")
+    var cloudSchedule by remember(product, accountId) { mutableStateOf<WorkSchedule?>(null) }
+    var scheduleError by remember(product, accountId) { mutableStateOf(false) }
+    LaunchedEffect(product, accountId, product?.summary) {
+        if (product != null && accountId != null) {
+            try {
+                val value = JSONObject(product.request("/v1/work-schedule"))
+                cloudSchedule = WorkSchedule(java.time.LocalTime.parse(value.getString("start")),
+                    java.time.LocalTime.parse(value.getString("end")))
+                scheduleError = false
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { scheduleError = true }
+        }
+    }
+    val localSchedule = if (product == null && schedule == null) rememberWorkSchedule() else null
+    val status = (if (product != null) cloudSchedule else schedule ?: localSchedule)?.status(now)
     val night = isNightTime(now.toLocalTime())
-    val working = status.working
+    val working = if (product != null) product.current != null else status?.working == true
+    val elapsed = if (product != null) sessionElapsedMinutes(product.current, now,
+        product.user?.optString("timezone") ?: java.time.ZoneId.systemDefault().id) else status?.elapsedMinutes
     val context = LocalContext.current
     val inspection = androidx.compose.ui.platform.LocalInspectionMode.current
-    val companionDays = product?.summary?.optLong("companionDays", 1) ?: remember(now.toLocalDate(), inspection) { if (inspection) 1L else WorkScheduleStore(context).companionDays(now.toLocalDate()) }
+    val greeting = if (greetingScene != null) rememberBuddyGreeting(scene = greetingScene).collectAsState().value else BuddyGreeting.Idle
+    val companionDays = if (product != null) product.summary.observedLong("companionDays")?.toString() ?: "--"
+        else remember(now.toLocalDate(), inspection) { if (inspection) "1" else WorkScheduleStore(context).companionDays(now.toLocalDate()).toString() }
     val scope = rememberCoroutineScope()
     val drawerMotion = remember { StatisticsDrawerMotion(expanded, scope) }
     BoxWithConstraints(Modifier.fillMaxSize().clipToBounds().testTag("morning_home")) {
@@ -137,6 +165,31 @@ internal fun MorningHomeContent(
             FigmaSvg("top_curve", s, Modifier.offset(x = (310.55f * s).dp, y = (-417.4f * s).dp)
                 .graphicsLayer { alpha = 1f - drawerProgress })
         }
+        // Preserve sync's uniform scene scaling and lower the Buddy/bubble group together.
+        val drawerTop = maxHeight.value - navHeight.value - bottomInset.value - 183f * s
+        val sceneScale = minOf(s, ((drawerTop - 184f * s) / 330f).coerceAtLeast(.35f))
+        val quoteHasRoom = controller.active == null || (density.fontScale <= 1.1f && maxHeight.value >= 760f * s)
+        val sceneOrigin = 184f * (s - sceneScale)
+        val artworkBottom = when {
+            controller.active?.kind?.usesDefaultArtwork == false -> 453f
+            night -> 545f
+            else -> 488.01f
+        }
+        val lowerLimit = drawerTop - if (quoteHasRoom) (48f * s + 16f * sceneScale) else 16f * s
+        val sceneDrop = minOf(32f * s, (lowerLimit - sceneOrigin - artworkBottom * sceneScale).coerceAtLeast(0f))
+        Box(Modifier.fillMaxSize().offset(x = ((maxWidth.value - 393f * sceneScale) / 2f).dp,
+            y = (sceneOrigin + sceneDrop).dp).testTag("home_ip_bubble_group")) {
+            HomeBuddyArtwork(controller, workPlayback, night, sceneScale, sceneScale)
+            HomeReminderBubble(controller, drawerProgress > .001f, sceneScale, sceneScale,
+                onReminderAcknowledged, onReminderChat, onDiary)
+            // Keep main's authenticated greeting, positioned with the new scene and hidden by the drawer.
+            if (greetingScene != null) {
+                if (greeting.show && greeting.message.isNotBlank() && controller.active == null && drawerProgress <= .001f) {
+                    BuddySpeechBubble(greeting.message, sceneScale,
+                        Modifier.offset(x = 22.dp * sceneScale, y = 198.dp * sceneScale))
+                }
+            }
+        }
         Column(Modifier.fillMaxWidth().statusBarsPadding()) {
             Spacer(Modifier.height((62f * s - topInset).coerceAtLeast(0f).dp))
             Row(Modifier.fillMaxWidth().height(51.dp * s).padding(horizontal = 16.dp * s),
@@ -145,6 +198,10 @@ internal fun MorningHomeContent(
                 Row(Modifier.offset(y = 8.dp * s), horizontalArrangement = Arrangement.spacedBy(8.dp * s)) {
                     HeaderIcon("calendar_circle", "calendar", s, "心情日历", onCalendar)
                     HeaderIcon("camera_circle", "camera", s, "陪伴视角", onCamera)
+                    Text("预览", color = HomeInk, fontSize = (12 * s).sp,
+                        modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(20.dp))
+                            .background(Color.White.copy(alpha = .48f)).clickable(role = Role.Button) { previewOpen = true }
+                            .padding(horizontal = 12.dp * s, vertical = 12.dp * s).testTag("home_state_preview"))
                 }
             }
             Row(Modifier.align(Alignment.CenterHorizontally).width(200.dp * s).height(38.dp * s)
@@ -153,61 +210,60 @@ internal fun MorningHomeContent(
                     Row(Modifier.weight(1f).fillMaxHeight()
                         .background(if (working == isWork) BuddyCream.copy(alpha = 0.6f) else Color.Transparent,
                             RoundedCornerShape(28.dp))
-                        .semantics { this.selected = working == isWork }.testTag(if (isWork) "work_mode" else "offwork_mode"),
+                        .then(if (product != null) Modifier.clickable(enabled = !product.busy && working != isWork, role = Role.Button) {
+                            if (isWork) product.startWork() else product.finishWork()
+                        } else Modifier)
+                        .semantics {
+                            this.selected = working == isWork
+                            if (product != null) contentDescription = if (isWork) "开始实际陪伴" else "结束实际陪伴"
+                        }.testTag(if (isWork) "work_mode" else "offwork_mode"),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                         FigmaSvg(if (isWork) "work" else "offwork", s)
                         Spacer(Modifier.width(6.dp * s))
-                        Text(if (isWork) "上班中" else "下班喽~", color = HomeInk, fontSize = (14 * s).sp)
+                        Text(if (product != null) {
+                            if (isWork) { if (working) "陪伴中" else "开始陪伴" }
+                            else { if (working) "结束陪伴" else "未陪伴" }
+                        } else if (isWork) "上班中" else "下班喽~", color = HomeInk, fontSize = (14 * s).sp)
                     }
                 }
             }
             Row(Modifier.fillMaxWidth().height(32.dp * s).padding(horizontal = 11.dp * s),
                 verticalAlignment = Alignment.CenterVertically) {
-                WorkTime("已上班", displayDuration(status.elapsedMinutes), s)
+                WorkTime(if (product != null) "已陪伴" else "已上班", elapsed?.let(::displayDuration) ?: "--", s)
                 Box(Modifier.weight(1f).padding(horizontal = 5.dp * s).height(13.dp * s)
                     .clip(RoundedCornerShape(8.dp))
                     .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(8.dp))) {
-                    Box(Modifier.fillMaxHeight().fillMaxWidth(status.progress).background(BuddyCream.copy(alpha = .6f)))
+                    Box(Modifier.fillMaxHeight().fillMaxWidth(status?.progress ?: 0f).background(BuddyCream.copy(alpha = .6f)))
                 }
-                WorkTime("距下班时间", displayDuration(status.remainingMinutes), s)
+                WorkTime("距下班时间", status?.remainingMinutes?.let(::displayDuration) ?: "--", s)
             }
-            if (product != null) androidx.compose.material3.TextButton(
-                onClick = { if (product.current == null) product.startWork() else product.finishWork() }, enabled = !product.busy,
-                modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text(if (product.current == null) "开始实际陪伴" else "结束实际陪伴", color = HomeInk)
-            }
-            Spacer(Modifier.height((if (night) 31 else 19).dp * s))
-            Box(Modifier.fillMaxWidth().height((if (night) 343 else 277).dp * s).clipToBounds()) {
-                if (night) Image(painterResource(R.drawable.home_buddy_night), "LookBuddy 回家休息",
-                    Modifier.align(Alignment.TopStart).wrapContentSize(Alignment.TopStart, unbounded = true).requiredSize(514.dp * s, 369.dp * s)
-                        .offset(x = (-58).dp * s, y = (-38).dp * s), contentScale = ContentScale.Fit)
-                else Image(painterResource(R.drawable.home_buddy_desk), "LookBuddy 在桌前陪你工作",
-                    Modifier.align(Alignment.TopCenter).offset(x = (-6).dp * s)
-                        .requiredSize(353.dp * s, 290.dp * s), contentScale = ContentScale.Crop)
-                // GLM 关心语气泡：在 Buddy IP 旁展示，不阻塞首页加载。
-                // greetingScene 为 null 时跳过（测试 / 预览模式），避免发网络请求。
-                if (greetingScene != null) {
-                    val greeting = rememberBuddyGreeting(scene = greetingScene)
-                    val g by greeting.collectAsState()
-                    if (g.show && g.message.isNotBlank()) {
-                        BuddySpeechBubble(
-                            message = g.message,
-                            s = s,
-                            modifier = Modifier.align(Alignment.TopStart)
-                                .offset(x = 22.dp * s, y = 10.dp * s)
-                                .testTag("buddy_greeting_bubble")
-                                .semantics { contentDescription = "Buddy 关心语" }
-                        )
-                    }
-                }
+            if (controller.active?.id?.startsWith("preview:") == true) Text("本地提醒预览", color = HomeMuted,
+                fontSize = (11 * s).sp, modifier = Modifier.align(Alignment.CenterHorizontally).testTag("home_preview_label"))
+            if (product?.busy == true) Text("同步中…", color = HomeMuted, fontSize = (11 * s).sp,
+                modifier = Modifier.align(Alignment.CenterHorizontally).testTag("home_loading"))
+            if (scheduleError) {
+                Text("工作时段读取失败，请重试", color = CompanionClay, fontSize = (11 * s).sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally).testTag("home_schedule_error"))
             }
         }
-        if (drawerProgress < 1f) {
+        if (greetingScene != null && desktopSyncVisible) {
+            val event = controller.active
+            val message = if (drawerProgress <= .001f) event?.message ?: greeting.message.takeIf { greeting.show } else ""
+            DesktopPetSyncEffect(
+                scene = event?.kind?.backendKey ?: if (night) "evening" else "idle",
+                working = working,
+                message = message,
+                eventId = event?.id ?: "home:${if (night) "night" else "day"}:${workPlayback.generation}",
+                defaultScene = if (night) "evening" else "idle",
+                completed = if (event != null && !event.kind.usesDefaultArtwork) controller.finished else night || workPlayback.completed
+            )
+        }
+        if (drawerProgress < 1f && quoteHasRoom) {
             Text("一起陪伴的第${companionDays}天，也要照顾好自己~", color = HomeInk, fontSize = (16 * s).sp,
                 letterSpacing = (2.2f * s).sp, lineHeight = (30 * s).sp, textAlign = TextAlign.Center,
                 modifier = Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = 1f - drawerProgress }
                     .padding(bottom = navHeight + bottomInset + drawerHeight + 18.dp * s)
-                    .fillMaxWidth().padding(horizontal = 20.dp * s))
+                    .fillMaxWidth().padding(horizontal = 20.dp * s).testTag("home_companion_quote"))
         }
         StatisticsDrawer(expanded, drawerMotion, s, Modifier.align(Alignment.BottomCenter)
             .padding(bottom = navHeight + bottomInset).height(drawerHeight), now.toLocalDate()) { expanded = it }
@@ -220,6 +276,21 @@ internal fun MorningHomeContent(
             }
         }, modifier = Modifier.align(Alignment.BottomCenter))
     }
+    if (previewOpen) ReminderPreviewDialog(controller, onClose = { previewOpen = false }, onNormal = {
+        controller.acknowledge()?.let(onReminderAcknowledged)
+    })
+}
+
+/** Missing summary fields must not silently become zero-valued measurements. */
+internal fun JSONObject?.observedLong(key: String): Long? = (this?.opt(key) as? Number)?.toLong()?.takeIf { it >= 0 }
+
+internal fun sessionElapsedMinutes(session: JSONObject?, now: java.time.LocalDateTime, zone: String): Long? {
+    val started = session?.optString("startedAt")?.takeIf { it.isNotBlank() } ?: return null
+    return runCatching {
+        val begin = runCatching { java.time.OffsetDateTime.parse(started).toInstant() }
+            .getOrElse { java.time.LocalDateTime.parse(started).toInstant(java.time.ZoneOffset.UTC) }
+        java.time.Duration.between(begin, now.atZone(java.time.ZoneId.of(zone)).toInstant()).toMinutes().coerceAtLeast(0)
+    }.getOrNull()
 }
 
 @Composable
@@ -356,7 +427,8 @@ private fun PrimaryStatistics(s: Float) {
             Spacer(Modifier.height(10.dp * s))
             Text("工作陪伴", color = HomeMuted, fontSize = (12 * s).sp)
             Spacer(Modifier.height(10.dp * s))
-            Text(summary?.let { displayDuration(it.optLong("workMs") / 60000) } ?: "待记录", color = HomeInk, fontSize = (18 * s).sp, fontWeight = FontWeight.Bold)
+            Text(summary.observedLong("workMs")?.let { displayDuration(it / 60000) } ?: "--", color = HomeInk,
+                fontSize = (18 * s).sp, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("home_work_duration"))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp * s)) {
             Row(Modifier.fillMaxWidth().height(46.dp * s).background(Color(0xFFFFF5EA), RoundedCornerShape(14.dp))
@@ -364,11 +436,11 @@ private fun PrimaryStatistics(s: Float) {
                 Text("今日状态", color = Color(0xFF7A634F), fontSize = (12 * s).sp, modifier = Modifier.weight(1f))
                 FigmaSvg("fire", s)
                 Spacer(Modifier.width(7.dp * s))
-                Text("待观察", color = Color(0xFF9E5436), fontSize = (14 * s).sp)
+                Text("暂无数据", color = Color(0xFF9E5436), fontSize = (14 * s).sp)
             }
             Row(Modifier.fillMaxWidth().height(96.dp * s), horizontalArrangement = Arrangement.spacedBy(10.dp * s)) {
-                SmallStatistic("tea", "今日饮水", summary?.let { "${it.optInt("drinkCount")} 次" } ?: "待记录", Color(0xFFECF4F4), s, Modifier.weight(1f))
-                SmallStatistic("stretch", "伸展次数", summary?.let { "${it.optInt("stretchCount")} 次" } ?: "待记录", Color(0xFFF1F4E8), s, Modifier.weight(1f))
+                SmallStatistic("tea", "今日饮水", summary.observedLong("drinkCount")?.let { "$it 次" } ?: "--", Color(0xFFECF4F4), s, Modifier.weight(1f))
+                SmallStatistic("stretch", "伸展次数", summary.observedLong("stretchCount")?.let { "$it 次" } ?: "--", Color(0xFFF1F4E8), s, Modifier.weight(1f))
             }
         }
     }
@@ -404,7 +476,7 @@ private fun SupplementaryStatistics(s: Float) {
             }
             Spacer(Modifier.height(12.dp * s))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(summary?.let { "%.1f".format(it.optLong("monthWorkMs") / 3600000.0) } ?: "--", color = HomeInk, fontSize = (32 * s).sp, fontWeight = FontWeight.Bold)
+                Text(summary.observedLong("monthWorkMs")?.let { "%.1f".format(it / 3600000.0) } ?: "--", color = HomeInk, fontSize = (32 * s).sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(7.dp * s))
                 Text("小时", color = Color(0xFF7A6657), fontSize = (13 * s).sp)
             }
@@ -413,14 +485,15 @@ private fun SupplementaryStatistics(s: Float) {
             Row(Modifier.fillMaxWidth().height(49.dp * s).background(Color(0xFFF1F6EB), RoundedCornerShape(14.dp))
                 .padding(horizontal = 12.dp * s), verticalAlignment = Alignment.CenterVertically) {
                 Text("今日坐姿", color = Color(0xFF7A6657), fontSize = (12 * s).sp, modifier = Modifier.weight(1f))
-                Text(if (summary?.optJSONObject("state")?.optString("posture") == "bad") "可以调整一下" else "待观察", color = Color(0xFF738C57), fontSize = (14 * s).sp)
+                val state = summary?.optJSONObject("state")
+                Text(if (state?.optBoolean("fresh") == true && state.optString("posture") == "bad") "可以调整一下" else "暂无数据", color = Color(0xFF738C57), fontSize = (14 * s).sp)
             }
             Row(Modifier.fillMaxWidth().height(49.dp * s).background(Color(0xFFF0F6F7), RoundedCornerShape(14.dp))
                 .padding(horizontal = 12.dp * s), verticalAlignment = Alignment.CenterVertically) {
                 FigmaSvg("moon", s)
                 Spacer(Modifier.width(6.dp * s))
                 Text("今日小憩", color = Color(0xFF7A6657), fontSize = (12 * s).sp, modifier = Modifier.weight(1f))
-                Text(summary?.let { "${it.optLong("breakMs") / 60000}min" } ?: "待记录", color = HomeInk, fontSize = (16 * s).sp, fontWeight = FontWeight.Bold)
+                Text(summary.observedLong("breakMs")?.let { "${it / 60000}min" } ?: "--", color = HomeInk, fontSize = (16 * s).sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -440,7 +513,7 @@ private fun BuddySpeechBubble(
 ) {
     Box(
         modifier
-            .width(220.dp * s)
+            .width(162.dp * s)
             .clipToBounds()
             .semantics { contentDescription = message }
             .testTag("buddy_greeting_bubble")
@@ -448,33 +521,17 @@ private fun BuddySpeechBubble(
         // 气泡主体（半透明白底，带圆角和阴影感）
         Column(
             Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp * s))
-                .background(Color.White.copy(alpha = 0.92f))
-                .padding(horizontal = 14.dp * s, vertical = 10.dp * s)
+                .clip(RoundedCornerShape(30.dp * s))
+                .background(Color.White.copy(alpha = 0.64f))
+                .padding(horizontal = 18.dp * s, vertical = 20.dp * s)
         ) {
             Text(
                 message,
                 color = HomeInk,
-                fontSize = (13 * s).sp,
-                lineHeight = (19 * s).sp,
-                textAlign = TextAlign.Start
+                fontSize = (15 * s).sp,
+                lineHeight = (24 * s).sp,
+                textAlign = TextAlign.Center
             )
-        }
-        // 气泡小尾巴（指向 Buddy 角色）
-        Canvas(
-            Modifier.size(12.dp * s, 8.dp * s)
-                .align(Alignment.BottomStart)
-                .offset(x = 28.dp * s, y = (-1).dp * s)
-        ) {
-            val w = size.width
-            val h = size.height
-            val path = Path().apply {
-                moveTo(0f, 0f)
-                lineTo(w, 0f)
-                lineTo(w * 0.2f, h)
-                close()
-            }
-            drawPath(path, Color.White.copy(alpha = 0.92f))
         }
     }
 }

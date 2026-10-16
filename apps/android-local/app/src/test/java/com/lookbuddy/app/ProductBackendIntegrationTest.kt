@@ -15,6 +15,38 @@ import java.time.LocalDate
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class ProductBackendIntegrationTest {
+    @Test fun androidTransportMatchesActualDesktopServerProtocol(): Unit = runBlocking {
+        val base = System.getenv("LOOKBUDDY_DESKTOP_INTEGRATION_BASE_URL")
+        assumeTrue("Isolated desktop server not configured", !base.isNullOrBlank())
+        val repository = DesktopPetSyncRepository(base!!, "test-only")
+        suspend fun desktop(): JSONObject = withContext(Dispatchers.IO) {
+            val connection = java.net.URL("$base/v1/state").openConnection() as java.net.HttpURLConnection
+            connection.setRequestProperty("X-LookBuddy-Token", "test-only")
+            try { JSONObject(connection.inputStream.bufferedReader().use { it.readText() }).getJSONObject("desktop") }
+            finally { connection.disconnect() }
+        }
+        val first = DesktopPetSyncRequest("drink", true, message = "喝口水吧", eventId = "p5:drink")
+        assertNotNull(repository.sync(first))
+        val event = desktop().getString("scene_event_id")
+        assertEquals("drink", desktop().getString("scene_action_id"))
+        assertNotNull(repository.sync(first))
+        assertEquals(event, desktop().getString("scene_event_id"))
+        assertNotNull(repository.sync(first.copy(completed = true, message = "")))
+        val completed = desktop()
+        assertEquals(event, completed.getString("scene_event_id"))
+        assertTrue(completed.getBoolean("scene_completed"))
+        assertEquals("", completed.getString("scene_message"))
+        assertNotNull(repository.sync(first.copy(eventId = "p5:next")))
+        assertNotEquals(event, desktop().getString("scene_event_id"))
+        assertNull(DesktopPetSyncRepository(base, "wrong-test-value").sync(first))
+        assertNull(repository.sync(first.copy(message = "x".repeat(65 * 1024))))
+        assertNotNull(repository.sync(first.copy(scene = "evening", eventId = "p5:night")))
+        assertEquals("night", desktop().getString("scene_action_id"))
+        val port = java.net.ServerSocket(0).use { it.localPort }
+        assertNull(DesktopPetSyncRepository("http://127.0.0.1:$port", "test-only").sync(first))
+        assertNotNull(repository.sync(first))
+    }
+
     private class MemoryVault : ProductSessionVault {
         var value: JSONObject? = null
         override fun read() = value
@@ -31,10 +63,14 @@ class ProductBackendIntegrationTest {
         try {
             assertFalse("An empty username cannot identify an account", client.login("", "产品联调", ""))
             for ((phone, code) in listOf("abc" to "wrong", "随便填写！" to "任意密码")) {
-                assertTrue("Demo input should be accepted: $phone", client.login(phone, "产品联调", code))
+                val loggedIn = client.login(phone, "产品联调", code)
+                assertTrue("Demo input should be accepted: $phone (${client.error})", loggedIn)
                 assertTrue(client.user!!.getBoolean("demo"))
                 client.request("/v1/account", "DELETE")
                 client.logout()
+                // logout() launches an action; finish it before starting the next identity.
+                withTimeout(5000) { while (client.busy) delay(10) }
+                assertNull(client.user)
             }
             assertTrue(client.login("13800000000", "产品联调"))
             assertTrue(client.user!!.getBoolean("demo"))
@@ -51,8 +87,10 @@ class ProductBackendIntegrationTest {
             client.sync()
             assertEquals("22:00", WorkScheduleStore(context).read().start.toString())
             val today = LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"))
-            assertTrue(client.saveMood(today, Mood.Calm))
-            client.sync(); assertEquals(Mood.Calm, client.moods[today])
+            for (mood in Mood.entries) {
+                assertTrue(client.saveMood(today, mood))
+                client.sync(); assertEquals(mood, client.moods[today])
+            }
             val session = JSONObject(client.request("/v1/work/start", "POST", JSONObject().put("installationId", client.installation)))
             assertEquals(session.getString("id"), JSONObject(client.request("/v1/work/start", "POST", JSONObject().put("installationId", client.installation))).getString("id"))
             assertTrue(client.mark().contains("不录制"))
@@ -61,6 +99,10 @@ class ProductBackendIntegrationTest {
             client.request("/v1/diaries/$today/generate", "POST", JSONObject())
             client.request("/v1/diaries/$today", "PATCH", JSONObject().put("content", "用户编辑版本"))
             assertEquals("用户编辑版本", JSONObject(client.request("/v1/diaries/$today/generate", "POST", JSONObject())).getString("content"))
+            client.request("/v1/diaries/$today", "DELETE")
+            val clearedDiary = JSONObject(client.request("/v1/diary-page/$today"))
+            assertEquals("", clearedDiary.getString("content"))
+            assertTrue("Deleting diary text retains the recorded timeline", clearedDiary.getJSONArray("entries").length() > 0)
             assertTrue(JSONObject(client.request("/buddy/greeting", "POST", JSONObject().put("scene", "morning_unknown"))).has("show"))
             client.request("/v1/sessions/${session.getString("id")}/finish", "POST", JSONObject())
             client.sync(); assertNull(client.current)

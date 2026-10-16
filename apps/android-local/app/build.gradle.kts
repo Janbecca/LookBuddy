@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -5,6 +7,17 @@ plugins {
 }
 
 apply(from = "sdk-dependencies.gradle.kts")
+
+val desktopProperties = Properties().apply {
+    val source = project.file("../local.properties")
+    if (source.isFile) source.inputStream().use { load(it) }
+}
+fun desktopConfigString(value: String): String = "\"" + value.replace("\\", "\\\\")
+    .replace("\"", "\\\"").replace("\r", "\\r").replace("\n", "\\n") + "\""
+val desktopUrl = providers.environmentVariable("LOOKBUDDY_DESKTOP_URL")
+    .orElse(desktopProperties.getProperty("lookbuddy.desktop.url", ""))
+val desktopToken = providers.environmentVariable("LOOKBUDDY_DESKTOP_TOKEN")
+    .orElse(desktopProperties.getProperty("lookbuddy.desktop.token", ""))
 
 android {
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
@@ -20,10 +33,18 @@ android {
         versionCode = 10
         versionName = "1.4.0-unified"
 
+        // Optional pairing is debug-only; release keeps the bridge disabled.
+        buildConfigField("String", "LOOKBUDDY_DESKTOP_URL", "\"\"")
+        buildConfigField("String", "LOOKBUDDY_DESKTOP_TOKEN", "\"\"")
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "LOOKBUDDY_DESKTOP_URL", desktopConfigString(desktopUrl.get()))
+            buildConfigField("String", "LOOKBUDDY_DESKTOP_TOKEN", desktopConfigString(desktopToken.get()))
+        }
         release {
             optimization {
                 enable = false
@@ -56,6 +77,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(platform(libs.androidx.compose.bom))
