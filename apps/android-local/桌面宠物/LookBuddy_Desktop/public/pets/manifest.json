@@ -1,0 +1,183 @@
+[
+  {
+    "id": "pet-1",
+    "name": "电脑办公",
+    "animation": "pets/pet-1.webp",
+    "still": "pets/pet-1.png",
+    "original": "pets/originals/pet-1.gif",
+    "width": 834,
+    "height": 578,
+    "frames": 66,
+    "durationMs": 6600
+  },
+  {
+    "id": "pet-2",
+    "name": "该喝水了",
+    "animation": "pets/pet-2.webp",
+    "still": "pets/pet-2.png",
+    "original": "pets/originals/pet-2.gif",
+    "width": 502,
+    "height": 544,
+    "frames": 45,
+    "durationMs": 4500
+  },
+  {
+    "id": "pet-3",
+    "name": "看电视吃薯片",
+    "animation": "pets/pet-3.webp",
+    "still": "pets/pet-3.png",
+    "original": "pets/originals/pet-3.gif",
+    "width": 960,
+    "height": 547,
+    "frames": 45,
+    "durationMs": 4500
+  },
+  {
+    "id": "pet-4",
+    "name": "沙发犯困",
+    "animation": "pets/pet-4.webp",
+    "still": "pets/pet-4.png",
+    "original": "pets/originals/pet-4.gif",
+    "width": 798,
+    "height": 533,
+    "frames": 45,
+    "durationMs": 4500
+  },
+  {
+    "id": "pet-5",
+    "name": "下班路上",
+    "animation": "pets/pet-5.webp",
+    "still": "pets/pet-5.png",
+    "original": "pets/originals/pet-5.gif",
+    "width": 960,
+    "height": 522,
+    "frames": 52,
+    "durationMs": 5200
+  },
+  {
+    "id": "drink",
+    "name": "该喝水了",
+    "animation": "pets/drink.webp",
+    "still": "pets/drink.png",
+    "width": 1120,
+    "height": 640,
+    "bounds": [
+      307,
+      3,
+      813,
+      551
+    ],
+    "frames": 45,
+    "durationMs": 4500,
+    "last": "pets/drink-last.png",
+    "sourceGitBlob": "4aab1a5a0591fea463d11bec03dea8281aec20dd"
+  },
+  {
+    "id": "stretch",
+    "name": "伸展",
+    "animation": "pets/stretch.webp",
+    "still": "pets/stretch.png",
+    "width": 1120,
+    "height": 640,
+    "bounds": [
+      272,
+      11,
+      848,
+      616
+    ],
+    "frames": 52,
+    "durationMs": 5200,
+    "last": "pets/stretch-last.png",
+    "sourceGitBlob": "047e1660ffee09214b7ddf6c127b17b34010fe12"
+  },
+  {
+    "id": "posture",
+    "name": "坐姿调整",
+    "animation": "pets/posture.webp",
+    "still": "pets/posture.png",
+    "width": 854,
+    "height": 640,
+    "bounds": [
+      0,
+      116,
+      718,
+      562
+    ],
+    "frames": 80,
+    "durationMs": 8000,
+    "last": "pets/posture-last.png",
+    "sourceGitBlob": "208d5c0729b51ce3472018e1293e63816ed2c82b"
+  },
+  {
+    "id": "fatigue",
+    "name": "趴桌犯困",
+    "animation": "pets/fatigue.webp",
+    "still": "pets/fatigue.png",
+    "width": 854,
+    "height": 640,
+    "bounds": [
+      38,
+      57,
+      731,
+      640
+    ],
+    "frames": 66,
+    "durationMs": 6600,
+    "last": "pets/fatigue-last.png",
+    "sourceGitBlob": "a8c2e1c855d109216245c9383ce22210e1ab6c7a"
+  },
+  {
+    "id": "happy",
+    "name": "暖暖的表情",
+    "animation": "pets/happy.webp",
+    "still": "pets/happy.png",
+    "width": 854,
+    "height": 640,
+    "bounds": [
+      152,
+      28,
+      696,
+      607
+    ],
+    "frames": 45,
+    "durationMs": 4500,
+    "last": "pets/happy-last.png",
+    "sourceGitBlob": "d660a282dffe83d909d0730d5f6539e2a2b967b0"
+  },
+  {
+    "id": "concern",
+    "name": "安慰倾听用户",
+    "animation": "pets/concern.webp",
+    "still": "pets/concern.png",
+    "width": 854,
+    "height": 640,
+    "bounds": [
+      137,
+      30,
+      685,
+      605
+    ],
+    "frames": 66,
+    "durationMs": 6600,
+    "last": "pets/concern-last.png",
+    "sourceGitBlob": "ae47eec5cc88b8fae53c410b54e1fd29a8ac2fbc"
+  },
+  {
+    "id": "morning",
+    "name": "首次打开",
+    "animation": "pets/morning.webp",
+    "still": "pets/morning.png",
+    "width": 1120,
+    "height": 640,
+    "bounds": [
+      285,
+      28,
+      841,
+      605
+    ],
+    "frames": 45,
+    "durationMs": 4500,
+    "last": "pets/morning-last.png",
+    "sourceGitBlob": "aab98e9134ab00e049f07f46e8053e970606f027"
+  }
+]
