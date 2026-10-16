@@ -84,7 +84,7 @@ class HomeReminderTest {
         compose.setContent { CompositionLocalProvider(LocalBuddyMotionEnabled provides false) {
             MorningHomeScreen(previewTime = LocalDateTime.of(2026,10,16,12,0), reminders = controller)
         } }
-        for (kind in HomeReminderKind.entries) {
+        for (kind in HomeReminderKind.entries.filter { it.buttonLabel != null && !it.usesDefaultArtwork }) {
             compose.onNodeWithTag("home_state_preview").performClick()
             compose.onNodeWithTag("preview_${kind.backendKey}").performScrollTo().performClick()
             compose.mainClock.advanceTimeBy(300)

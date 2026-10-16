@@ -26,7 +26,12 @@ internal enum class BuddyClip(val raw: Int, val first: Int, val last: Int) {
     Introduction(R.raw.buddy_intro, R.drawable.buddy_intro_first, R.drawable.buddy_intro_last),
     Work(R.raw.buddy_work, R.drawable.buddy_work_first, R.drawable.buddy_work_last),
     Drink(R.raw.buddy_drink, R.drawable.buddy_drink_first, R.drawable.buddy_drink_last),
-    Fatigue(R.raw.buddy_fatigue, R.drawable.buddy_fatigue_first, R.drawable.buddy_fatigue_last)
+    Fatigue(R.raw.buddy_fatigue, R.drawable.buddy_fatigue_first, R.drawable.buddy_fatigue_last),
+    Stretch(R.raw.buddy_stretch, R.drawable.buddy_stretch_first, R.drawable.buddy_stretch_last),
+    Posture(R.raw.buddy_posture, R.drawable.buddy_posture_first, R.drawable.buddy_posture_last),
+    Happy(R.raw.buddy_happy, R.drawable.buddy_happy_first, R.drawable.buddy_happy_last),
+    Concern(R.raw.buddy_concern, R.drawable.buddy_concern_first, R.drawable.buddy_concern_last),
+    Morning(R.raw.buddy_morning, R.drawable.buddy_morning_first, R.drawable.buddy_morning_last)
 }
 internal const val WorkReplayIntervalMs = 60L * 60L * 1000L
 internal val LocalWorkReplayInterval = staticCompositionLocalOf { WorkReplayIntervalMs }

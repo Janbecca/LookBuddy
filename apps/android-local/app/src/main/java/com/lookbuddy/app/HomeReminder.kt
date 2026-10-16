@@ -45,14 +45,25 @@ internal enum class HomeReminderKind(val backendKey: String, val label: String, 
     Posture("posture", "调整姿态", "坐舒服一点", "肩膀松一松，换个舒服的坐姿吧。"),
     Stand("stand", "起身休息", "起来走走吧", "起来走两步？给身体换个节奏。"),
     Happy("happy", "开心表情陪伴", "开心传给你", "有什么开心的小事吗？想听你说说。"),
-    Worried("worried", "担忧表情陪伴", "我在这里呢", "想找个地方说说话吗？我听着。");
+    Worried("worried", "担忧表情陪伴", "我在这里呢", "想找个地方说说话吗？我听着。"),
+    MorningGreeting("morning_unknown", "早间问候", "早呀", "按你的节奏慢慢开始。"),
+    EveningGreeting("evening", "晚间问候", "晚上好", "忙到间隙时，也给自己留点时间。"),
+    DiaryReady("diary_ready", "工位日记", "今天的小记录", "工位日记准备好了，要去看看吗？");
 
     val opensChat: Boolean get() = this in setOf(Fatigue, Happy, Worried)
-    val buttonLabel: String get() = if (opensChat) "聊一聊" else "好的"
+    val isGreeting: Boolean get() = this == MorningGreeting || this == EveningGreeting
+    val buttonLabel: String? get() = when {
+        isGreeting -> null
+        this == DiaryReady -> "去看看"
+        opensChat -> "聊一聊"
+        else -> "好的"
+    }
+    val usesDefaultArtwork: Boolean get() = this == EveningGreeting || this == DiaryReady
 
     companion object {
         fun fromBackendKey(key: String): HomeReminderKind? = when (key) {
             "sedentary" -> Stand
+            "morning_seated" -> MorningGreeting
             "joyful", "good", "positive_expression" -> Happy
             "possibly_stressed", "possibly_low", "possibly_angry", "concern_expression" -> Worried
             else -> entries.firstOrNull { it.backendKey == key }
@@ -130,7 +141,7 @@ internal fun HomeBuddyArtwork(
     verticalScale: Float
 ) {
     val event = controller.active
-    if (event == null) {
+    if (event == null || event.kind.usesDefaultArtwork) {
         if (night) {
             Image(painterResource(R.drawable.home_buddy_night), "LookBuddy 回家休息",
                 Modifier.offset(x = (-58).dp * s, y = 176.dp * verticalScale)
@@ -146,51 +157,47 @@ internal fun HomeBuddyArtwork(
             }
         }
     } else key(event.id) {
-        Box(Modifier.offset(x = 100.52.dp * s, y = 257.dp * verticalScale)
-            .size(352.48.dp * s, 248.dp * s).clipToBounds().testTag("buddy_reminder_${event.kind.backendKey}")) {
+        Box(Modifier.offset(y = 257.dp * verticalScale)
+            .size(393.dp * s, 248.dp * s).clipToBounds().testTag("buddy_reminder_${event.kind.backendKey}")) {
             ReminderArtwork(event, controller.finished, s) { controller.finish(event.id) }
         }
     }
 }
 
-/** Transparent source bounds are calibrated per asset, rather than stretching the entire WebP into the IP slot. */
+/** Scene-to-asset mapping is centralized; original WebP bytes stay unchanged. */
+internal data class ReminderArtworkSpec(
+    val clip: BuddyClip, val sourceWidth: Float, val sourceHeight: Float,
+    val left: Float, val top: Float, val right: Float, val bottom: Float
+)
+
+internal val ReminderArtworkHeight = 192.71484f // Current drink: 550 * 224.25 / 640.
+
+internal fun reminderArtworkSpec(kind: HomeReminderKind): ReminderArtworkSpec? = when (kind) {
+    HomeReminderKind.Drink -> ReminderArtworkSpec(BuddyClip.Drink, 1120.0f, 640.0f, 306.0f, 2.0f, 814.0f, 552.0f)
+    HomeReminderKind.Stand -> ReminderArtworkSpec(BuddyClip.Stretch, 1120.0f, 640.0f, 272.0f, 11.0f, 848.0f, 616.0f)
+    HomeReminderKind.Posture -> ReminderArtworkSpec(BuddyClip.Posture, 854.0f, 640.0f, 0.0f, 116.0f, 718.0f, 560.0f)
+    HomeReminderKind.Fatigue -> ReminderArtworkSpec(BuddyClip.Fatigue, 854.0f, 640.0f, 38.0f, 57.0f, 731.0f, 640.0f)
+    HomeReminderKind.Happy -> ReminderArtworkSpec(BuddyClip.Happy, 854.0f, 640.0f, 152.0f, 28.0f, 696.0f, 607.0f)
+    HomeReminderKind.Worried -> ReminderArtworkSpec(BuddyClip.Concern, 854.0f, 640.0f, 137.0f, 30.0f, 685.0f, 605.0f)
+    HomeReminderKind.MorningGreeting -> ReminderArtworkSpec(BuddyClip.Morning, 1120.0f, 640.0f, 285.0f, 28.0f, 841.0f, 605.0f)
+    else -> null
+}
+
 @Composable
 private fun ReminderArtwork(event: HomeReminderEvent, completed: Boolean, s: Float, onFinished: () -> Unit) {
-    val progress = remember(event.id) { Animatable(if (completed) 1f else 0f) }
-    val inspection = LocalInspectionMode.current || !LocalBuddyMotionEnabled.current
-    val temporaryMotion = event.kind !in listOf(HomeReminderKind.Drink, HomeReminderKind.Fatigue)
-    LaunchedEffect(event.id) {
-        if (temporaryMotion && !completed && !inspection) { progress.animateTo(1f, tween(1600)); if (event.kind in listOf(HomeReminderKind.Happy, HomeReminderKind.Worried)) onFinished() }
-    }
-    val pose = Modifier.graphicsLayer {
-        val pulse = if (completed || inspection) 0f else sin(progress.value * Math.PI * 2).toFloat()
-        transformOrigin = TransformOrigin(.5f, 1f)
-        if (event.kind == HomeReminderKind.Posture) rotationZ = pulse * 3f
-        if (event.kind == HomeReminderKind.Stand || event.kind == HomeReminderKind.Happy) translationY = -kotlin.math.abs(pulse) * 6.dp.toPx() * s
-        if (event.kind == HomeReminderKind.Worried) rotationZ = pulse * 2f
-    }
-    when (event.kind) {
-        HomeReminderKind.Drink -> {
-            // The original 1120×640 WebP has visible pixels x306..814/y2..552.
-            // This fits the Figma visible character around x177..355/y259..456.
-            BuddyWebpOnce(BuddyClip.Drink, description = "LookBuddy 饮水提醒", completed = completed,
-                modifier = Modifier.offset(x = (-30.75).dp * s, y = 2.54.dp * s)
-                    .wrapContentSize(Alignment.TopStart, unbounded = true).requiredSize(392.44.dp * s, 224.25.dp * s),
-                contentScale = ContentScale.Fit, onFinished = onFinished)
-        }
-        HomeReminderKind.Fatigue -> BuddyWebpOnce(BuddyClip.Fatigue, description = "LookBuddy 疲劳提醒",
-            modifier = Modifier.offset(x = 41.6.dp * s, y = 48.1.dp * s)
-                .wrapContentSize(Alignment.TopStart, unbounded = true).requiredSize(247.96.dp * s, 141.69.dp * s),
-            completed = completed, contentScale = ContentScale.Fit, onFinished = onFinished)
-        HomeReminderKind.Posture, HomeReminderKind.Stand -> BuddyWebpOnce(BuddyClip.Introduction,
-            description = "LookBuddy ${event.kind.label}",
-            modifier = Modifier.offset(x = (-14.1).dp * s, y = (-7.1).dp * s)
-                .wrapContentSize(Alignment.TopStart, unbounded = true).requiredSize(357.3.dp * s, 204.2.dp * s).then(pose),
-            completed = completed, contentScale = ContentScale.Fit, onFinished = onFinished)
-        HomeReminderKind.Happy, HomeReminderKind.Worried -> Image(
-            painterResource(if (event.kind == HomeReminderKind.Happy) R.drawable.mood_happy else R.drawable.mood_sad),
-            "LookBuddy ${event.kind.label}",
-            Modifier.offset(x = 77.dp * s, y = 25.dp * s).size(178.dp * s).then(pose), contentScale = ContentScale.Fit)
+    val spec = reminderArtworkSpec(event.kind) ?: return
+    val scale = ReminderArtworkHeight / (spec.bottom - spec.top)
+    val visibleWidth = (spec.right - spec.left) * scale
+    // Center on the existing drink Buddy. Wide desk/sofa scenes remain inside the screen.
+    val x = minOf(265.98875f - visibleWidth / 2f, 381f - visibleWidth).coerceAtLeast(0f)
+    Box(Modifier.offset(x = x.dp * s, y = 3.24078.dp * s)
+        .size(visibleWidth.dp * s, ReminderArtworkHeight.dp * s).clipToBounds()
+        .testTag("reminder_visible_artwork")) {
+        BuddyWebpOnce(spec.clip, description = "LookBuddy ${event.kind.label}", completed = completed,
+            modifier = Modifier.offset(x = (-spec.left * scale).dp * s, y = (-spec.top * scale).dp * s)
+                .wrapContentSize(Alignment.TopStart, unbounded = true)
+                .requiredSize((spec.sourceWidth * scale).dp * s, (spec.sourceHeight * scale).dp * s),
+            contentScale = ContentScale.Fit, onFinished = onFinished)
     }
 }
 
@@ -201,9 +208,16 @@ internal fun HomeReminderBubble(
     s: Float,
     verticalScale: Float,
     onAcknowledged: (String) -> Unit,
-    onChat: (HomeReminderEvent) -> Unit = {}
+    onChat: (HomeReminderEvent) -> Unit = {},
+    onDiary: () -> Unit = {}
 ) {
     val event = controller.active
+    LaunchedEffect(event?.id) {
+        if (event?.kind?.isGreeting == true) {
+            kotlinx.coroutines.delay(6000)
+            if (controller.active?.id == event.id) controller.acknowledge()?.let(onAcknowledged)
+        }
+    }
     var last by remember { mutableStateOf(event) }
     SideEffect { if (event != null) last = event }
     val fontScale = LocalDensity.current.fontScale
@@ -220,14 +234,15 @@ internal fun HomeReminderBubble(
                 textAlign = TextAlign.Center, modifier = Modifier.width(120.dp * s))
             Text(display.message, color = CompanionMuted, fontSize = (15f * s).sp, lineHeight = (22.5f * s).sp,
                 textAlign = TextAlign.Center, modifier = Modifier.width(120.dp * s))
-            Box(Modifier.width(104.dp * s).heightIn(min = maxOf(44.dp, 44.dp * s))
+            if (display.kind.buttonLabel != null) Box(Modifier.width(104.dp * s).heightIn(min = maxOf(44.dp, 44.dp * s))
                 .clip(RoundedCornerShape(22.dp * s)).background(Color.White.copy(alpha = .48f))
                 .clickable(enabled = event?.id == display.id && !hidden, role = Role.Button) {
                     val current = controller.active
                     controller.acknowledge()?.let(onAcknowledged)
                     if (current?.kind?.opensChat == true) onChat(current)
+                    if (current?.kind == HomeReminderKind.DiaryReady) onDiary()
                 }.testTag("acknowledge_reminder"), contentAlignment = Alignment.Center) {
-                Text(display.kind.buttonLabel, color = CompanionInk, fontSize = (15f * s).sp, lineHeight = (22f * s).sp)
+                Text(display.kind.buttonLabel.orEmpty(), color = CompanionInk, fontSize = (15f * s).sp, lineHeight = (22f * s).sp)
             }
         }
     }

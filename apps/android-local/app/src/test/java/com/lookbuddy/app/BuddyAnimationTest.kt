@@ -26,7 +26,7 @@ class BuddyAnimationTest {
     @get:Rule val compose = createComposeRule()
     @Test fun bundledWebpsContainTheExpectedAnimationFrames() {
         val resources = ApplicationProvider.getApplicationContext<Context>().resources
-        val expected = mapOf(BuddyClip.Introduction to 45, BuddyClip.Work to 66, BuddyClip.Drink to 45, BuddyClip.Fatigue to 45)
+        val expected = mapOf(BuddyClip.Introduction to 45, BuddyClip.Work to 66, BuddyClip.Drink to 45, BuddyClip.Fatigue to 66, BuddyClip.Stretch to 52, BuddyClip.Posture to 80, BuddyClip.Happy to 45, BuddyClip.Concern to 66, BuddyClip.Morning to 45)
         for ((clip, frameCount) in expected) {
             val data = resources.openRawResource(clip.raw).use { it.readBytes() }
             assertEquals("RIFF", String(data.copyOfRange(0, 4)))

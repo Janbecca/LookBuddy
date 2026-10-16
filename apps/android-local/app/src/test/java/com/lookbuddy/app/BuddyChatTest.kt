@@ -20,13 +20,17 @@ import org.robolectric.annotation.LooperMode
 class BuddyChatTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun homeEntryOpensChatAndBackReturnsHome() {
+    @Test fun homeChatIsOnlyAvailableInsideMappedReminderAndBackReturnsHome() {
         var back: OnBackPressedDispatcher? = null
         compose.setContent {
             back = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
             CompositionLocalProvider(LocalBuddyMotionEnabled provides false) { LookBuddyApp() }
         }
-        compose.onNodeWithTag("home_chat_entry").performClick()
+        compose.onNodeWithTag("home_chat_entry").assertDoesNotExist()
+        compose.onNodeWithTag("home_state_preview").performClick()
+        compose.onNodeWithTag("preview_fatigue").performScrollTo().performClick()
+        compose.mainClock.advanceTimeBy(300)
+        compose.onNodeWithTag("acknowledge_reminder").performClick()
         compose.onNodeWithTag("buddy_chat_screen").assertIsDisplayed()
         compose.onNodeWithTag("chat_input").assertIsDisplayed()
         compose.runOnIdle { back!!.onBackPressed() }

@@ -65,7 +65,6 @@ internal fun LookBuddyApp(
         when (page) {
             CompanionPage.Home -> MorningHomeScreen(reminders = reminders, onReminderAcknowledged = acknowledge,
                 onDiary = { page = CompanionPage.Diary }, onSettings = { page = CompanionPage.Settings },
-                onChat = { openChat(null) },
                 onReminderChat = { event -> openChat(event.message) })
             else -> CompanionPageLayout(page, onPage = { page = it }) { s ->
                 when (page) {

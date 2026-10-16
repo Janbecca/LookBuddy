@@ -28,3 +28,5 @@
 2026-10-16 Buddy统一语气规则：backend/src/lookbuddy/buddy_prompt.py 封装人格、主动提示、聊天与每次输出前的语病/人格自检。仅主动提示最多30字符（含标点）；聊天无固定字数上限，口语自然、引导倾诉、理解后给建议。仅疲劳、开心表情、可能不轻松表情、晚间问候提供chatEntry聊一聊入口，其他场景为null。事件提醒沿用固定话术，动态问候使用共享Prompt，超长或异常输出回退完整短句，稍后提醒保留表情入口。前端按钮和聊天API尚未实现。本地backend对应约定分支apps/android-local/backend，不更新main或apps/backend。来源基线1dd748503431ab2f29526736592e737cd3cf3556；本次提交号与逐文件核对结果见工作区output/buddy-prompt-20261016/sync-result.json，后续以实际分支最新提交为准。
 
 - 2026-10-16 App 1.6.0 聊一聊前端：按Figma 299:3996新增暖色背景聊天页，日记页354:4094气泡及首页入口可进入，疲劳/开心/关心提醒按钮进入聊天，其他三类为“好的”并关闭。复用现有三Tab；返回恢复来源页面，草稿与未发送内容支持Activity状态恢复。聊天API未接入，用户内容明确标记暂未发送，不模拟Buddy回复。原始Figma素材本地打包；仅前端改动，同步apps/android-local约定分支，不更新main或apps/backend。本次提交号和验证结果见工作区output/lookbuddy-chat-ui/sync-result.json。具体范围见CHAT_UI.md。
+
+- 2026-10-16 App 1.6.1 首页动画纠正：按用户给定路径接入饮水/伸展/坐姿/趴桌犯困/开心/安慰倾听/早间七个原始WebP，文件Git blob SHA逐一登记于HOME_REMINDER_ASSETS.json。删除首页顶部单独聊一聊入口，首页仅疲劳/开心/关心气泡进入聊天，日记页入口保留。默认态尺寸及播放逻辑不改；其他动画按现有饮水有效高度192.71484dp统一等比缩放，宽场景保持屏内，坐姿素材的黑色边带仅在渲染时裁开，原始文件不改。早晚问候无按钮，工位日记去看看跳到日记；后端触发接收仍待接入。本次同步记录见工作区output/lookbuddy-animation-fix/sync-result.json。

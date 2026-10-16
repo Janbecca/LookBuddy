@@ -1,0 +1,107 @@
+[
+  {
+    "key": "drink",
+    "source": "D:\\Everything\\Anker\\projects\\lookbuddy\\状态buddy\\LookBuddy设计资产\\首页ＩＰ状态\\该喝水了\\该喝水了.webp",
+    "rawPath": "app/src/main/res/raw/buddy_drink.webp",
+    "sha": "4aab1a5a0591fea463d11bec03dea8281aec20dd",
+    "width": 1120,
+    "height": 640,
+    "frames": 45,
+    "bounds": [
+      307,
+      3,
+      813,
+      551
+    ]
+  },
+  {
+    "key": "stretch",
+    "source": "D:\\Everything\\Anker\\projects\\lookbuddy\\状态buddy\\LookBuddy设计资产\\首页ＩＰ状态\\伸展\\伸展.webp",
+    "rawPath": "app/src/main/res/raw/buddy_stretch.webp",
+    "sha": "047e1660ffee09214b7ddf6c127b17b34010fe12",
+    "width": 1120,
+    "height": 640,
+    "frames": 52,
+    "bounds": [
+      272,
+      11,
+      848,
+      616
+    ]
+  },
+  {
+    "key": "posture",
+    "source": "D:\\Everything\\Anker\\projects\\lookbuddy\\状态buddy\\LookBuddy设计资产\\首页ＩＰ状态\\坐姿调整\\坐姿调整.webp",
+    "rawPath": "app/src/main/res/raw/buddy_posture.webp",
+    "sha": "208d5c0729b51ce3472018e1293e63816ed2c82b",
+    "width": 854,
+    "height": 640,
+    "frames": 80,
+    "bounds": [
+      0,
+      116,
+      718,
+      570
+    ]
+  },
+  {
+    "key": "fatigue",
+    "source": "D:\\Everything\\Anker\\projects\\lookbuddy\\状态buddy\\LookBuddy设计资产\\首页ＩＰ状态\\疲劳\\趴桌犯困.webp",
+    "rawPath": "app/src/main/res/raw/buddy_fatigue.webp",
+    "sha": "a8c2e1c855d109216245c9383ce22210e1ab6c7a",
+    "width": 854,
+    "height": 640,
+    "frames": 66,
+    "bounds": [
+      38,
+      57,
+      731,
+      640
+    ]
+  },
+  {
+    "key": "happy",
+    "source": "D:\\Everything\\Anker\\projects\\lookbuddy\\状态buddy\\LookBuddy设计资产\\首页ＩＰ状态\\开心表情陪伴\\暖暖的表情.webp",
+    "rawPath": "app/src/main/res/raw/buddy_happy.webp",
+    "sha": "d660a282dffe83d909d0730d5f6539e2a2b967b0",
+    "width": 854,
+    "height": 640,
+    "frames": 45,
+    "bounds": [
+      152,
+      28,
+      696,
+      607
+    ]
+  },
+  {
+    "key": "concern",
+    "source": "D:\\Everything\\Anker\\projects\\lookbuddy\\状态buddy\\LookBuddy设计资产\\首页ＩＰ状态\\不开兴表情陪伴\\安慰倾听用户.webp",
+    "rawPath": "app/src/main/res/raw/buddy_concern.webp",
+    "sha": "ae47eec5cc88b8fae53c410b54e1fd29a8ac2fbc",
+    "width": 854,
+    "height": 640,
+    "frames": 66,
+    "bounds": [
+      137,
+      30,
+      685,
+      605
+    ]
+  },
+  {
+    "key": "morning",
+    "source": "D:\\Everything\\Anker\\projects\\lookbuddy\\状态buddy\\LookBuddy设计资产\\首次打开\\首次打开.webp",
+    "rawPath": "app/src/main/res/raw/buddy_morning.webp",
+    "sha": "aab98e9134ab00e049f07f46e8053e970606f027",
+    "width": 1120,
+    "height": 640,
+    "frames": 45,
+    "bounds": [
+      285,
+      28,
+      841,
+      605
+    ]
+  }
+]

@@ -31,3 +31,22 @@ import java.time.LocalDateTime
             previewDate=java.time.LocalDate.of(2026,10,16), reminders=state)
     }
 }
+
+@PreviewTest @Preview(widthDp=393, heightDp=852, showSystemUi=true, device="spec:width=393dp,height=852dp,dpi=160")
+@Composable fun MorningGreetingScreenshot() = ReminderScreenshot(HomeReminderKind.MorningGreeting)
+@PreviewTest @Preview(widthDp=393, heightDp=852, showSystemUi=true, device="spec:width=393dp,height=852dp,dpi=160")
+@Composable fun EveningGreetingScreenshot() = ReminderScreenshot(HomeReminderKind.EveningGreeting, night=true)
+@PreviewTest @Preview(widthDp=393, heightDp=852, showSystemUi=true, device="spec:width=393dp,height=852dp,dpi=160")
+@Composable fun DiaryReadyReminderScreenshot() = ReminderScreenshot(HomeReminderKind.DiaryReady)
+@PreviewTest @Preview(widthDp=393, heightDp=852, showSystemUi=true, device="spec:width=393dp,height=852dp,dpi=160")
+@Composable fun DefaultDayArtworkScreenshot() {
+    CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib, LocalBuddyMotionEnabled provides false) {
+        MorningHomeScreen(previewTime=LocalDateTime.of(2026,10,16,12,30), previewDate=java.time.LocalDate.of(2026,10,16))
+    }
+}
+@PreviewTest @Preview(widthDp=393, heightDp=852, showSystemUi=true, device="spec:width=393dp,height=852dp,dpi=160")
+@Composable fun DefaultNightArtworkScreenshot() {
+    CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib, LocalBuddyMotionEnabled provides false) {
+        MorningHomeScreen(previewTime=LocalDateTime.of(2026,10,16,20,30), previewDate=java.time.LocalDate.of(2026,10,16))
+    }
+}
