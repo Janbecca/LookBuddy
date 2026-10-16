@@ -82,7 +82,7 @@ class OnboardingFlowTest {
     }
 
     @Test fun registeredUserSkipsFirstRegistrationAfterSplash() {
-        preferences.edit().putBoolean("completed", true).putInt("flow_version", 2).commit()
+        preferences.edit().putBoolean("completed", true).putInt("flow_version", CurrentOnboardingVersion).commit()
         launch()
         compose.onNodeWithText("已进入首页").assertExists()
         compose.onNodeWithTag("page_Greeting").assertDoesNotExist()
@@ -110,6 +110,26 @@ class OnboardingFlowTest {
         compose.onNodeWithTag("page_Phone").assertExists()
     }
 
+    @Test fun previousVersionReopensAllRegistrationPagesAndKeepsNickname() {
+        preferences.edit().putBoolean("completed", true).putInt("flow_version", 2)
+            .putString("nickname", "保留昵称").commit()
+        advanceToNickname(0)
+        compose.onNodeWithTag("nickname").assertTextEquals("保留昵称")
+        compose.onNodeWithTag("next").performScrollTo().performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag("page_Phone").assertExists()
+        compose.onNodeWithTag("next").performScrollTo().performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag("page_DeviceConnection").assertExists()
+        compose.onNodeWithTag("connect_0").performScrollTo().performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag("page_FormalIntroduction").assertExists()
+        compose.onNodeWithTag("next").performScrollTo().performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithText("已进入首页").assertExists()
+        org.junit.Assert.assertEquals(CurrentOnboardingVersion, preferences.getInt("flow_version", 0))
+        org.junit.Assert.assertEquals("保留昵称", preferences.getString("nickname", null))
+    }
     @Test fun oldRegistrationStillShowsTheNewOnboardingFlow() {
         preferences.edit().putBoolean("completed", true).commit()
         launch()
@@ -127,7 +147,7 @@ class OnboardingFlowTest {
     }
 
     @Test fun registeredUserCanReplayIntroductionAndCancelWithoutLosingData() {
-        preferences.edit().putBoolean("completed", true).putInt("flow_version", 2).putString("nickname", "我的昵称").commit()
+        preferences.edit().putBoolean("completed", true).putInt("flow_version", CurrentOnboardingVersion).putString("nickname", "我的昵称").commit()
         compose.setContent {
             MaterialTheme {
                 LookBuddyStartup {
@@ -152,7 +172,7 @@ class OnboardingFlowTest {
     }
 
     @Test fun personalSettingsReplayEntryOpensTheFullStartupFlow() {
-        preferences.edit().putBoolean("completed", true).putInt("flow_version", 2).commit()
+        preferences.edit().putBoolean("completed", true).putInt("flow_version", CurrentOnboardingVersion).commit()
         compose.setContent {
             MaterialTheme { LookBuddyStartup { LookBuddyApp(initialPage = CompanionPage.Settings) } }
         }

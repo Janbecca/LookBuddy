@@ -12,9 +12,13 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class StaticArtworkResourceTest {
-    @Test fun buddyArtworkContainsARealPng() {
+    @Test fun buddyArtworkContainsARealPng() = assertPng(R.drawable.diary_buddy)
+
+    @Test fun allStartupPagesShareARealPngPlaceholder() = assertPng(R.drawable.onboarding_buddy_placeholder)
+
+    private fun assertPng(resourceId: Int) {
         val resources = ApplicationProvider.getApplicationContext<Context>().resources
-        val header = resources.openRawResource(R.drawable.diary_buddy).use { input ->
+        val header = resources.openRawResource(resourceId).use { input ->
             ByteArray(8).also { bytes ->
                 check(input.read(bytes) == bytes.size)
             }

@@ -62,6 +62,9 @@ internal val OnboardingHandwriting = FontFamily(Font(R.font.fontqu_smile))
 internal val OnboardingDeviceFont = FontFamily(Font(R.font.lxgw_wenkai_light))
 internal val LocalReplayIntroduction = staticCompositionLocalOf<() -> Unit> { {} }
 
+// Re-show the corrected full flow once to devices that completed an earlier version.
+internal const val CurrentOnboardingVersion = 3
+
 internal enum class StartupStep {
     Splash, Greeting, Introduction, Destiny, ConnectionTeaser, Nickname, Phone, DeviceConnection, FormalIntroduction, Home;
 
@@ -73,7 +76,7 @@ internal enum class StartupStep {
 @Composable
 internal fun LookBuddyStartup(home: @Composable () -> Unit) {
     val preferences = LocalContext.current.getSharedPreferences("lookbuddy_onboarding", Context.MODE_PRIVATE)
-    var registered by remember { mutableStateOf(preferences.getInt("flow_version", 0) >= 2) }
+    var registered by remember { mutableStateOf(preferences.getInt("flow_version", 0) >= CurrentOnboardingVersion) }
     var step by rememberSaveable { mutableStateOf(StartupStep.Splash) }
     var nickname by rememberSaveable { mutableStateOf(preferences.getString("nickname", "") ?: "") }
     var phone by rememberSaveable { mutableStateOf("") }
@@ -104,7 +107,7 @@ internal fun LookBuddyStartup(home: @Composable () -> Unit) {
         keyboard?.hide()
         focus.clearFocus()
         if (step == StartupStep.FormalIntroduction) {
-            preferences.edit().putBoolean("completed", true).putInt("flow_version", 2)
+            preferences.edit().putBoolean("completed", true).putInt("flow_version", CurrentOnboardingVersion)
                 .putString("nickname", nickname).apply()
             registered = true
             replaying = false
@@ -339,10 +342,10 @@ private fun BuddyImage(scale: Float, step: StartupStep = StartupStep.Greeting, m
     }
 }
 
-/** Single replacement point for future animated IP. The current asset is a static Figma original. */
+/** Single replacement point for future animated IP. Every startup page uses a verified single-frame PNG placeholder. */
 @Composable
 internal fun OnboardingArtwork(modifier: Modifier = Modifier) {
-    Image(painterResource(R.drawable.diary_buddy), "LookBuddy 戴着棕色帽子的小伙伴",
+    Image(painterResource(R.drawable.onboarding_buddy_placeholder), "LookBuddy 戴着棕色帽子的小伙伴",
         modifier, contentScale = ContentScale.Crop)
 }
 
