@@ -111,7 +111,9 @@ internal fun MorningHomeContent(
     now: java.time.LocalDateTime = rememberAppTime(),
     schedule: WorkSchedule = rememberWorkSchedule(),
     reminders: HomeReminderController = rememberHomeReminderController(),
-    onReminderAcknowledged: (String) -> Unit = {}
+    onReminderAcknowledged: (String) -> Unit = {},
+    onChat: () -> Unit = {},
+    onReminderChat: (HomeReminderEvent) -> Unit = {}
 ) {
     var expanded by rememberSaveable { mutableStateOf(initialExpanded) }
     val workPlayback = LocalWorkPlayback.current ?: rememberWorkBuddyPlayback()
@@ -145,7 +147,7 @@ internal fun MorningHomeContent(
         Box(Modifier.fillMaxSize().offset(x = ((maxWidth.value - 393f * sceneScale) / 2f).dp,
             y = (184f * (s - sceneScale)).dp)) {
             HomeBuddyArtwork(reminders, workPlayback, night, sceneScale, sceneScale)
-            HomeReminderBubble(reminders, drawerProgress > .001f, sceneScale, sceneScale, onReminderAcknowledged)
+            HomeReminderBubble(reminders, drawerProgress > .001f, sceneScale, sceneScale, onReminderAcknowledged, onReminderChat)
         }
         Column(Modifier.fillMaxWidth().statusBarsPadding()) {
             Spacer(Modifier.height((62f * s - topInset).coerceAtLeast(0f).dp))
@@ -153,6 +155,10 @@ internal fun MorningHomeContent(
                 verticalAlignment = Alignment.CenterVertically) {
                 Text("LOOKBuddy", color = Color.Black, fontSize = (24 * s).sp, modifier = Modifier.weight(1f))
                 Row(Modifier.offset(y = 8.dp * s), horizontalArrangement = Arrangement.spacedBy(8.dp * s)) {
+                    Text("聊一聊", color = HomeInk, fontSize = (12 * s).sp,
+                        modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(20.dp))
+                            .background(Color.White.copy(alpha = .48f)).clickable(role = Role.Button, onClick = onChat)
+                            .padding(horizontal = 10.dp * s, vertical = 12.dp * s).testTag("home_chat_entry"))
                     HeaderIcon("calendar_circle", "calendar", s, "心情日历", onCalendar)
                     Text("预览", color = HomeInk, fontSize = (12 * s).sp,
                         modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(20.dp))

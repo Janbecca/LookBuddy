@@ -40,6 +40,9 @@ internal fun LookBuddyApp(
 ) {
     var page by rememberSaveable { mutableStateOf(initialPage) }
     val reminders = rememberHomeReminderController()
+    val chat = rememberBuddyChatState()
+    var showChat by rememberSaveable { mutableStateOf(false) }
+    val openChat: (String?) -> Unit = { opening -> chat.enter(opening); showChat = true }
     val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(reminderSource, owner) {
@@ -52,15 +55,21 @@ internal fun LookBuddyApp(
     }
     val savedPages = rememberSaveableStateHolder()
     val workPlayback = rememberWorkBuddyPlayback()
-    BackHandler(page != CompanionPage.Home) { page = CompanionPage.Home }
+    BackHandler(showChat || page != CompanionPage.Home) {
+        if (showChat) showChat = false else page = CompanionPage.Home
+    }
     CompositionLocalProvider(LocalWorkPlayback provides workPlayback) {
-    savedPages.SaveableStateProvider(page.name) {
+    if (showChat) {
+        BuddyChatScreen(chat, onPage = { showChat = false; page = it })
+    } else savedPages.SaveableStateProvider(page.name) {
         when (page) {
             CompanionPage.Home -> MorningHomeScreen(reminders = reminders, onReminderAcknowledged = acknowledge,
-                onDiary = { page = CompanionPage.Diary }, onSettings = { page = CompanionPage.Settings })
+                onDiary = { page = CompanionPage.Diary }, onSettings = { page = CompanionPage.Settings },
+                onChat = { openChat(null) },
+                onReminderChat = { event -> openChat(event.message) })
             else -> CompanionPageLayout(page, onPage = { page = it }) { s ->
                 when (page) {
-                    CompanionPage.Diary -> DiaryScreen(s)
+                    CompanionPage.Diary -> DiaryScreen(s, onChat = { openChat("今天有什么想和我说说的吗？") })
                     CompanionPage.Settings -> PersonalSettingsScreen(s)
                     else -> Unit
                 }

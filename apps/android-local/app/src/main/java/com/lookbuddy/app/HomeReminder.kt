@@ -40,15 +40,23 @@ import kotlinx.coroutines.flow.Flow
 import kotlin.math.sin
 
 internal enum class HomeReminderKind(val backendKey: String, val label: String, val title: String, val message: String) {
-    Drink("drink", "饮水提醒", "喝口水吧", "歇一小会儿\n我陪你一起～"),
-    Fatigue("fatigue", "疲劳提醒", "眼睛累了吗", "闭眼歇一歇\n我陪你放松～"),
-    Posture("posture", "调整姿态", "坐舒服一点", "肩膀放轻松\n一起坐端正～"),
-    Stand("stand", "起身休息", "起来走走吧", "伸个懒腰\n让身体透透气～"),
-    Happy("happy", "开心表情陪伴", "开心传给你", "今天的小美好\n一起收藏～"),
-    Worried("worried", "担忧表情陪伴", "我在这里呢", "慢慢来就好\n我一直陪着你～");
+    Drink("drink", "饮水提醒", "喝口水吧", "手边有水的话，顺便喝两口吧。"),
+    Fatigue("fatigue", "疲劳提醒", "眼睛累了吗", "歇一小会儿吧，想聊聊的话我听着。"),
+    Posture("posture", "调整姿态", "坐舒服一点", "肩膀松一松，换个舒服的坐姿吧。"),
+    Stand("stand", "起身休息", "起来走走吧", "起来走两步？给身体换个节奏。"),
+    Happy("happy", "开心表情陪伴", "开心传给你", "有什么开心的小事吗？想听你说说。"),
+    Worried("worried", "担忧表情陪伴", "我在这里呢", "想找个地方说说话吗？我听着。");
+
+    val opensChat: Boolean get() = this in setOf(Fatigue, Happy, Worried)
+    val buttonLabel: String get() = if (opensChat) "聊一聊" else "好的"
 
     companion object {
-        fun fromBackendKey(key: String): HomeReminderKind? = entries.firstOrNull { it.backendKey == key }
+        fun fromBackendKey(key: String): HomeReminderKind? = when (key) {
+            "sedentary" -> Stand
+            "joyful", "good", "positive_expression" -> Happy
+            "possibly_stressed", "possibly_low", "possibly_angry", "concern_expression" -> Worried
+            else -> entries.firstOrNull { it.backendKey == key }
+        }
     }
 }
 
@@ -192,7 +200,8 @@ internal fun HomeReminderBubble(
     hidden: Boolean,
     s: Float,
     verticalScale: Float,
-    onAcknowledged: (String) -> Unit
+    onAcknowledged: (String) -> Unit,
+    onChat: (HomeReminderEvent) -> Unit = {}
 ) {
     val event = controller.active
     var last by remember { mutableStateOf(event) }
@@ -214,9 +223,11 @@ internal fun HomeReminderBubble(
             Box(Modifier.width(104.dp * s).heightIn(min = maxOf(44.dp, 44.dp * s))
                 .clip(RoundedCornerShape(22.dp * s)).background(Color.White.copy(alpha = .48f))
                 .clickable(enabled = event?.id == display.id && !hidden, role = Role.Button) {
+                    val current = controller.active
                     controller.acknowledge()?.let(onAcknowledged)
+                    if (current?.kind?.opensChat == true) onChat(current)
                 }.testTag("acknowledge_reminder"), contentAlignment = Alignment.Center) {
-                Text("知道了", color = CompanionInk, fontSize = (15f * s).sp, lineHeight = (22f * s).sp)
+                Text(display.kind.buttonLabel, color = CompanionInk, fontSize = (15f * s).sp, lineHeight = (22f * s).sp)
             }
         }
     }

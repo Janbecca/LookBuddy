@@ -57,7 +57,7 @@ internal val DiaryExampleEntries = listOf(
 )
 
 @Composable
-internal fun DiaryScreen(s: Float) {
+internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}) {
     val today = rememberAppTime().toLocalDate()
     var dateText by rememberSaveable { mutableStateOf<String?>(null) }
     var example by rememberSaveable { mutableStateOf(false) }
@@ -75,7 +75,7 @@ internal fun DiaryScreen(s: Float) {
             Text(date.format(DateTimeFormatter.ofPattern("M月d日 · E", Locale.CHINA)),
                 color = CompanionMuted, fontSize = (11 * s).sp)
         }
-        BuddyDiaryCarousel(s, showExample)
+        BuddyDiaryCarousel(s, showExample, onChat)
         if (showExample) {
             Text("设计稿示例 · 非真实时间记录", color = CompanionMuted, fontSize = 12.sp)
             TextButton(onClick = { example = false; dateText = null }) { Text("返回今天", color = CompanionClay) }
@@ -122,9 +122,10 @@ internal fun DiaryScreen(s: Float) {
 }
 
 @Composable
-private fun BuddyDiaryCarousel(s: Float, example: Boolean) {
+private fun BuddyDiaryCarousel(s: Float, example: Boolean, onChat: () -> Unit) {
     val pager = rememberPagerState(initialPage = 1, pageCount = { 3 })
     val fs = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    val primaryX = maxOf(87f, -13f + 88f * fs + 12f)
     val groups = if (!example) List(3) { listOf("今天，也很高兴见到你。", "我在这里陪着你。", "记录的小事，会在这里慢慢积攒。") } else listOf(
         listOf("08:05，新的一天，你带着好心情来啦。", "10:10，又给自己补充了一点水分。", "你认真工作的时候，我就安静陪着你。"),
         listOf("17:23，你有点累了。我们一起伸展了一下。", "18:05，今天也辛苦啦，明天见！", "工位也被你收拾好了，今天的小事我都记着。"),
@@ -133,8 +134,8 @@ private fun BuddyDiaryCarousel(s: Float, example: Boolean) {
     Box(Modifier.fillMaxWidth().height(223.dp * s * fs)) {
         VerticalPager(pager, Modifier.fillMaxSize().testTag("diary_bubbles")) { page ->
             Box(Modifier.fillMaxSize()) {
-                DiaryBubble(groups[page][0], 13f, s, Modifier.offset(42.dp * s, 5.dp * s * fs)
-                    .width(279.dp * s).heightIn(min = 55.dp * s * fs))
+                DiaryBubble(groups[page][0], 13f, s, Modifier.offset(primaryX.dp * s, 5.dp * s * fs)
+                    .width((321f - primaryX).coerceAtLeast(150f).dp * s).heightIn(min = 55.dp * s * fs))
                 DiaryBubble(groups[page][1], 12f, s, Modifier.offset(113.dp * s, 74.dp * s * fs)
                     .width(216.dp * s).heightIn(min = 28.dp * s * fs), soft = true)
                 DiaryBubble(groups[page][2], 12f, s, Modifier.offset(121.dp * s, 120.dp * s * fs)
@@ -142,6 +143,12 @@ private fun BuddyDiaryCarousel(s: Float, example: Boolean) {
                 Text("上下轻滑动气泡", color = CompanionMuted, fontSize = (10 * s).sp,
                     modifier = Modifier.offset(184.dp * s, 183.dp * s * fs))
             }
+        }
+        Box(Modifier.offset(x = (-13).dp * s, y = 27.dp * s * fs).size(88.dp * s * fs, 44.dp * s * fs)
+            .clickable(role = Role.Button, onClick = onChat).testTag("diary_chat_entry"), contentAlignment = Alignment.Center) {
+            FigmaSvg("diary_chat_entry", s * fs, folder = "chat")
+            Text("和我聊一聊", color = Color(0xFF38291F), fontFamily = OnboardingDeviceFont,
+                fontSize = (14 * s).sp, lineHeight = (22 * s).sp, modifier = Modifier.offset(y = (-3).dp * s))
         }
         BuddyWebpOnce(BuddyClip.Introduction, Modifier.offset(x = (-13).dp * s, y = 74.dp * s * fs)
             .size(121.dp * s, 126.dp * s), "LookBuddy 欢迎你翻开日记")

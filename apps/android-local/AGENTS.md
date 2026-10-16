@@ -21,3 +21,5 @@
 - 2026-10-16 后端合并：实际 backend 以 main@69622817b38c1ebdf7af846cd8fab9e9826f164f 的 apps/backend 为主，完整导入38个上游文件并保持业务源码与测试原样；本地启动兼容 python app.py/start.bat、5210端口及旧GLM_*环境变量。合并结果对应远端 apps/android-local/backend，旧5文件保存在本地 backend-backups（不提交）；.env/数据库/虚拟环境不提交。GitHub问候接口要求Bearer登录，旧App无令牌请求仍需后续接入；本次没有修改Android页面或绕过鉴权。86项测试和隔离HTTP验证通过。后端后续修改 src/lookbuddy；继续按约定分支同步，具体提交号以工作区同步记录为准。
 
 2026-10-16 Buddy统一语气规则：backend/src/lookbuddy/buddy_prompt.py 封装人格、主动提示、聊天与每次输出前的语病/人格自检。仅主动提示最多30字符（含标点）；聊天无固定字数上限，口语自然、引导倾诉、理解后给建议。仅疲劳、开心表情、可能不轻松表情、晚间问候提供chatEntry聊一聊入口，其他场景为null。事件提醒沿用固定话术，动态问候使用共享Prompt，超长或异常输出回退完整短句，稍后提醒保留表情入口。前端按钮和聊天API尚未实现。本地backend对应约定分支apps/android-local/backend，不更新main或apps/backend。来源基线1dd748503431ab2f29526736592e737cd3cf3556；本次提交号与逐文件核对结果见工作区output/buddy-prompt-20261016/sync-result.json，后续以实际分支最新提交为准。
+
+- 2026-10-16 App 1.6.0 聊一聊前端：按Figma 299:3996新增暖色背景聊天页，日记页354:4094气泡及首页入口可进入，疲劳/开心/关心提醒按钮进入聊天，其他三类为“好的”并关闭。复用现有三Tab；返回恢复来源页面，草稿与未发送内容支持Activity状态恢复。聊天API未接入，用户内容明确标记暂未发送，不模拟Buddy回复。原始Figma素材本地打包；仅前端改动，同步apps/android-local约定分支，不更新main或apps/backend。本次提交号和验证结果见工作区output/lookbuddy-chat-ui/sync-result.json。具体范围见CHAT_UI.md。

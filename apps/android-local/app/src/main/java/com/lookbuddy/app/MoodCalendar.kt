@@ -85,7 +85,9 @@ internal fun MorningHomeScreen(
     onSettings: () -> Unit = {},
     previewTime: java.time.LocalDateTime? = null,
     reminders: HomeReminderController = rememberHomeReminderController(),
-    onReminderAcknowledged: (String) -> Unit = {}
+    onReminderAcknowledged: (String) -> Unit = {},
+    onChat: () -> Unit = {},
+    onReminderChat: (HomeReminderEvent) -> Unit = {}
 ) {
     val context = LocalContext.current
     val store = remember(context) { MoodStore(context) }
@@ -98,6 +100,7 @@ internal fun MorningHomeScreen(
             // previewDate 非空时为测试 / 预览模式，跳过 GLM 气泡请求避免网络干扰
             MorningHomeContent(initialExpanded, greetingScene = if (previewDate != null) null else "morning_seated",
                 reminders = reminders, onReminderAcknowledged = onReminderAcknowledged,
+                onChat = onChat, onReminderChat = onReminderChat,
                 onDiary = onDiary, onSettings = onSettings, onCalendar = {
                 records = previewRecords ?: store.week(date)
                 open = true
