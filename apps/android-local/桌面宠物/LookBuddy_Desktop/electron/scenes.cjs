@@ -13,7 +13,7 @@ function sceneAction(event = {}, fallback = 'pet-1') {
     return fallback;
   }
   if (scene.startsWith('morning_')) return 'morning';
-  if (scene === 'evening' || scene === 'evening_rain' || scene === 'night') return 'pet-3';
+  if (scene === 'evening' || scene === 'evening_rain' || scene === 'night') return 'night';
   if (scene === 'diary_ready') return fallback;
   return fallback;
 }

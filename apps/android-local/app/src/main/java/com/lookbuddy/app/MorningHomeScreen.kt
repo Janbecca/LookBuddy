@@ -196,13 +196,17 @@ internal fun MorningHomeContent(
                 WorkTime("距下班时间", displayDuration(status.remainingMinutes), s)
             }
         }
-        // Keep the user's existing optional desktop bridge; its greeting never adds a second home bubble.
+        // Mirror the artwork controller and only the prompt actually visible on Home.
         if (greetingScene != null) {
-            val greeting by rememberBuddyGreeting(scene = greetingScene).collectAsState()
             val desktopEvent = reminders.active
-            DesktopPetSyncEffect(scene = desktopEvent?.kind?.backendKey ?: if (greeting.show) greetingScene else if (night) "evening" else "idle", working = working,
-                message = desktopEvent?.message ?: greeting.message.takeIf { greeting.show && it.isNotBlank() },
-                eventId = desktopEvent?.id, defaultScene = if (night) "evening" else "idle")
+            DesktopPetSyncEffect(
+                scene = desktopEvent?.kind?.backendKey ?: if (night) "evening" else "idle",
+                working = working,
+                message = desktopEvent?.message?.takeIf { drawerProgress <= .001f },
+                eventId = desktopEvent?.id ?: "home:${if (night) "night" else "day"}:${workPlayback.generation}",
+                defaultScene = if (night) "evening" else "idle",
+                completed = if (desktopEvent != null && !desktopEvent.kind.usesDefaultArtwork) reminders.finished else night || workPlayback.completed
+            )
         }
 
         if (drawerProgress < 1f && quoteHasRoom) {

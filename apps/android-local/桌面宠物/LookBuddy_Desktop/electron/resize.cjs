@@ -1,7 +1,7 @@
 // All coordinates are Electron logical pixels (DIP), independent of Windows scaling.
 const MIN_SIZE = 138; // 460 DIP × 30%.
 const MAX_SIZE = 920;
-const DEFAULT_SIZE = 460;
+const DEFAULT_SIZE = 233;
 const EDGES = new Set(['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']);
 
 function limitsFor(area) {

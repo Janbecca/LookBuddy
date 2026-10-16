@@ -9,12 +9,12 @@ for (const [event, expected] of [
   ...['good','joyful'].map(label => [{scene:'emotion',label}, 'happy']),
   ...['possibly_stressed','possibly_low','possibly_angry'].map(label => [{scene:'emotion',label}, 'concern']),
   [{scene:'morning_seated'},'morning'], [{scene:'morning_unknown'},'morning'],
-  [{scene:'evening'},'pet-3'], [{scene:'diary_ready'},'pet-1'],
+  [{scene:'evening'},'night'], [{scene:'diary_ready'},'pet-1'],
   [{scene:'emotion',label:'focused'},'pet-1'], [{scene:'unknown'},'pet-1'],
   [{scene:'constructor'},'pet-1'], [{scene:42},'pet-1'],
 ]) test(JSON.stringify(event), () => assert.equal(sceneAction(event),expected));
 
-test('authenticated HTTP events change animation; heartbeat preserves transient event; expiry restores evening', async () => {
+test('Home snapshot overrides transient event immediately; same ID updates text and completion without replay', async () => {
   const server = createSyncServer({port: 0, host:'127.0.0.1', token:'test-only', reminderDurationMs:100});
   try {
     const address = await server.start();
@@ -24,22 +24,28 @@ test('authenticated HTTP events change animation; heartbeat preserves transient 
     };
     assert.equal((await post('reminders',{scene:'drink'},false)).status,401);
     let result=await post('sync',{scene:'evening',message:'晚上好'});
-    assert.equal(result.desktop.scene_action_id,'pet-3');
+    assert.equal(result.desktop.scene_action_id,'night');
     result=await post('reminders',{id:'reminder-1',category:'emotion',label:'possibly_low',message:'我听着'});
     assert.equal(result.desktop.scene_action_id,'concern');
-    const event=result.desktop.scene_event_id;
     result=await post('sync',{scene:'evening',message:'晚上好'});
-    assert.equal(result.desktop.scene_action_id,'concern');
-    assert.equal(result.desktop.scene_event_id,event);
+    assert.equal(result.desktop.scene_action_id,'night');
     await new Promise(resolve=>setTimeout(resolve,130));
-    assert.equal(server.snapshot().scene_action_id,'pet-3');
+    assert.equal(server.snapshot().scene_action_id,'night');
     result=await post('reminders',{scene:'diary_ready',message:'日记准备好了'});
-    assert.equal(result.desktop.scene_action_id,'pet-3');
+    assert.equal(result.desktop.scene_action_id,'night');
     result=await post('sync',{scene:'morning_unknown'});
     await new Promise(resolve=>setTimeout(resolve,130));
     result=await post('sync',{scene:'drink',id:'same'});
     const first=result.desktop.scene_event_id;
     result=await post('sync',{scene:'drink',id:'same'});
+    assert.equal(result.desktop.scene_event_id,first);
+    result=await post('sync',{scene:'drink',id:'same',message:'喝口水吧',completed:true});
+    assert.equal(result.desktop.scene_event_id,first);
+    assert.equal(result.desktop.scene_message,'喝口水吧');
+    assert.equal(result.desktop.scene_completed,true);
+    assert.equal(result.desktop.display_message,undefined);
+    result=await post('sync',{scene:'drink',id:'same',message:''});
+    assert.equal(result.desktop.message,'');assert.equal(result.desktop.scene_message,'');
     assert.equal(result.desktop.scene_event_id,first);
     result=await post('sync',{scene:'drink',id:'next'});
     assert.notEqual(result.desktop.scene_event_id,first);

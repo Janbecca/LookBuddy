@@ -5,7 +5,7 @@ import manifest from '../public/pets/manifest.json';
 
 type Pet = { id: string; name: string; animation: string; still: string; width: number; height: number; bounds?: number[]; last?: string; durationMs?: number };
 const bridge = window.lookbuddy;
-const defaultState: PetState = { index: 0, width: 460, bubble: true, auto: false, paused: false };
+const defaultState: PetState = { index: 0, width: 233, bubble: true, auto: false, paused: false };
 const resizeEdges: ResizeEdge[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 const edgeLabels: Record<ResizeEdge, string> = { nw: '左上角', n: '上边框', ne: '右上角', e: '右边框', se: '右下角', s: '下边框', sw: '左下角', w: '左边框' };
 
@@ -17,12 +17,10 @@ function App() {
   const [loaded, setLoaded] = useState(false);
   const [finished, setFinished] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [geometry, setGeometry] = useState<WindowGeometry>({ width: 460, height: 460, limits: { min: 138, max: 920, default: 460 }, editing: false });
+  const [geometry, setGeometry] = useState<WindowGeometry>({ width: 233, height: 233, limits: { min: 138, max: 920, default: 233 }, editing: false });
   const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [remoteMessage, setRemoteMessage] = useState('');
-  const [remoteScene, setRemoteScene] = useState({ action: '', event: '' });
-  const lastRemoteEvent = useRef('');
-  const remoteMessageTimer = useRef<number | undefined>(undefined);
+  const [remoteScene, setRemoteScene] = useState({ action: '', event: '', completed: false });
   const mask = useRef<HTMLCanvasElement | null>(null);
   const dragging = useRef(false);
   const resizing = useRef(false);
@@ -48,21 +46,16 @@ function App() {
   useEffect(() => {
     const applySync = (next: DesktopSyncSnapshot | null) => {
       if (!next) return;
-      if (next.scene_event_id !== lastRemoteEvent.current) {
-        lastRemoteEvent.current = next.scene_event_id || '';
-        setLoaded(false);
-        setRemoteScene({ action: next.scene_action_id || '', event: next.scene_event_id || '' });
-      }
-      const message = next.display_message || next.scene_message || next.message || '';
-      setRemoteMessage(message);
-      window.clearTimeout(remoteMessageTimer.current);
-      if (next.display_message) {
-        remoteMessageTimer.current = window.setTimeout(() => setRemoteMessage(next.scene_message || next.message || ''), 8000);
-      }
+      const action = next.scene_action_id || '';
+      const event = next.scene_event_id || '';
+      const completed = Boolean(next.scene_completed);
+      setRemoteScene(current => current.action === action && current.event === event && current.completed === completed
+        ? current : { action, event, completed });
+      setRemoteMessage((next.scene_message ?? next.message ?? '').trim());
     };
     bridge.readSyncState().then(applySync).catch(() => {});
     const unsubscribe = bridge.onSyncUpdated(applySync);
-    return () => { unsubscribe(); window.clearTimeout(remoteMessageTimer.current); };
+    return unsubscribe;
   }, []);
 
   useEffect(() => { if (ready) bridge.saveState(state); }, [state, ready]);
@@ -164,18 +157,18 @@ function App() {
   if (error) return <main className="error" data-interactive><p>宠物暂时没能出来</p><small>{error}</small><button onClick={() => location.reload()}>重新加载</button></main>;
   if (!pet) return null;
   const scale = Math.min(viewport.width, viewport.height) / 460;
-  const percent = Math.round(geometry.width / 460 * 100);
+  const percent = Math.round(geometry.width / 233 * 100);
   const bounds = pet.bounds;
   const cropScale = bounds ? Math.min(420 / (bounds[2] - bounds[0]), 330 / (bounds[3] - bounds[1])) : 1;
-  const petImage = <img key={`${pet.id}:${remoteScene.event}:${state.paused}`} className={`pet-image ${loaded ? 'loaded' : ''}`} src={state.paused ? pet.still : finished && pet.last ? pet.last : `${pet.animation}?event=${encodeURIComponent(remoteScene.event)}`} alt={pet.name} draggable={false}
+  const petImage = <img key={`${pet.id}:${remoteScene.event}:${state.paused}`} className={`pet-image ${loaded ? 'loaded' : ''}`} src={state.paused ? pet.still : (finished || remoteScene.completed) && pet.last ? pet.last : `${pet.animation}?event=${encodeURIComponent(remoteScene.event)}`} alt={pet.name} draggable={false}
     style={bounds ? { position: 'absolute', maxWidth: 'none', maxHeight: 'none', width: pet.width * cropScale, height: pet.height * cropScale, left: -bounds[0] * cropScale, top: -bounds[1] * cropScale } : undefined}
     width={pet.width} height={pet.height} onLoad={() => setLoaded(true)} onError={() => setError(`无法加载动作：${pet.name}`)}
     onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={cancelDrag} onLostPointerCapture={cancelDrag} />;
   return <div className={`viewport ${editing ? 'is-editing' : ''}`} onContextMenu={event => event.preventDefault()}>
   <main className="companion" style={{ transform: `scale(${scale})`, left: (viewport.width - 460 * scale) / 2, top: (viewport.height - 460 * scale) / 2 }}>
     <div className="speech-slot">
-      {state.bubble && <div className="bubble" data-interactive role="status" aria-live="polite" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={cancelDrag} onLostPointerCapture={cancelDrag}>
-        <span className="bubble-text">{remoteMessage || pet.name}</span>
+      {state.bubble && remoteMessage && <div className="bubble" data-interactive role="status" aria-live="polite" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={cancelDrag} onLostPointerCapture={cancelDrag}>
+        <span className="bubble-text">{remoteMessage}</span>
       </div>}
     </div>
     <div className="pet-stage">
@@ -187,7 +180,7 @@ function App() {
     <span className="resize-readout" role="status" aria-live="off">{percent}% <span>等比缩放</span></span>
     <button className="resize-done" data-interactive onClick={() => bridge.resizeMode(false)}>完成</button>
     <div className="resize-guide" data-interactive>
-      <span><span className="resize-guide-label">拖动边框 · </span>{Math.round(geometry.limits.min / 460 * 100)}%–{Math.round(geometry.limits.max / 460 * 100)}%</span>
+      <span><span className="resize-guide-label">拖动边框 · </span>{Math.round(geometry.limits.min / 233 * 100)}%–{Math.round(geometry.limits.max / 233 * 100)}%</span>
       <button onClick={() => bridge.resetSize()}>重置</button>
     </div>
     {resizeEdges.map(edge => <button key={edge} className={`resize-handle handle-${edge}`} data-interactive data-resize-edge={edge}

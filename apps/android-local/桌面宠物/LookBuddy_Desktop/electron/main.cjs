@@ -12,12 +12,12 @@ if (smoke) {
   app.setPath('userData', profile);
   app.setPath('sessionData', profile);
 }
-const legacySizes = { small: 360, medium: 460, large: 580 };
+const { migratePreferences } = require('./preferences.cjs');
 let win, nativeWindow, tray, cursorTimer, dragSession, dragTimeout, saveTimer, resizeSession, resizeTimeout, topmostTimer, syncServer;
 let syncState = null;
 let resizeMode = false;
 let userHidden = false, petReady = false, menuOpen = false;
-let state = { index: 0, width: DEFAULT_SIZE, bubble: true, auto: false, paused: false };
+let state = { index: 0, width: DEFAULT_SIZE, bubble: true, auto: false, paused: false, sizeVersion: 1 };
 const stateFile = () => path.join(app.getPath('userData'), 'preferences.json');
 const save = () => {
   clearTimeout(saveTimer);
@@ -139,7 +139,7 @@ else {
     if (!smoke) {
       try {
         const saved = JSON.parse(fs.readFileSync(stateFile(), 'utf8'));
-        state = { ...state, ...saved, width: Number.isFinite(saved.width) ? saved.width : (legacySizes[saved.size] || DEFAULT_SIZE) };
+        state = { ...state, ...migratePreferences(saved) };
         delete state.size;
       } catch { /* first launch */ }
     }
@@ -317,7 +317,7 @@ else {
         if (!win.isAlwaysOnTop()) throw new Error('Topmost did not recover');
         const names = [];
         for (let index = 0; index < pets.length; index++) {
-          names.push(await win.webContents.executeJavaScript(`(async () => { const image = document.querySelector('.pet-image'); await image.decode(); if (!image.naturalWidth) throw new Error('Image failed to load'); return document.querySelector('.bubble-text').textContent; })()`));
+          names.push(await win.webContents.executeJavaScript(`(async () => { const image = document.querySelector('.pet-image'); await image.decode(); if (!image.naturalWidth) throw new Error('Image failed to load'); return document.querySelector('.pet-image').alt; })()`));
           createMenu().getMenuItemById('next').click();
           await new Promise(resolve => setTimeout(resolve, 80));
         }

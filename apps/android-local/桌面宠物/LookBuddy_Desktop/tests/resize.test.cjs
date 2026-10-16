@@ -22,7 +22,7 @@ test('limits clamp overshoot without distorting aspect ratio', () => {
   assert.equal(resizeBounds(start, 'se', { x: -10000, y: -10000 }, area).width, 138);
   assert.equal(normalizeSize(100, area), 138);
   assert.equal(limitsFor(area).min / 460, 0.3);
-  assert.equal(normalizeSize(NaN, area), 460);
+  assert.equal(normalizeSize(NaN, area), 233);
   assert.equal(normalizeSize(321, area), 321);
   assert.equal(resizeBounds(start, 'e', { x: 1, y: 0 }, area).width, 461);
 });
@@ -37,6 +37,6 @@ test('screen constraints include negative monitor coordinates and small displays
     assert.ok(result.x + result.width <= display.x + display.width);
     assert.ok(result.y + result.height <= display.y + display.height);
   }
-  assert.deepEqual(limitsFor({ width: 260, height: 400 }), { min: 138, max: 260, default: 260 });
+  assert.deepEqual(limitsFor({ width: 260, height: 400 }), { min: 138, max: 260, default: 233 });
   assert.deepEqual(limitsFor({ width: 100, height: 400 }), { min: 100, max: 100, default: 100 });
 });

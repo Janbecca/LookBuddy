@@ -5,10 +5,18 @@
     "animation": "pets/pet-1.webp",
     "still": "pets/pet-1.png",
     "original": "pets/originals/pet-1.gif",
-    "width": 834,
-    "height": 578,
+    "width": 1138,
+    "height": 640,
     "frames": 66,
-    "durationMs": 6600
+    "durationMs": 6600,
+    "bounds": [
+      99,
+      59,
+      939,
+      640
+    ],
+    "last": "pets/pet-1-last.png",
+    "sourceGitBlob": "b00e6b2831ca16df16f3b6ebf773f21bcf6b8003"
   },
   {
     "id": "pet-2",
@@ -179,5 +187,22 @@
     "durationMs": 4500,
     "last": "pets/morning-last.png",
     "sourceGitBlob": "aab98e9134ab00e049f07f46e8053e970606f027"
+  },
+  {
+    "id": "night",
+    "name": "晚间休息",
+    "animation": "pets/night.png",
+    "still": "pets/night.png",
+    "last": "pets/night.png",
+    "width": 1120,
+    "height": 640,
+    "bounds": [
+      160,
+      110,
+      958,
+      640
+    ],
+    "frames": 1,
+    "sourceGitBlob": "924e144d1a56040adb4e368ff7782b6484179979"
   }
 ]

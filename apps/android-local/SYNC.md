@@ -36,3 +36,5 @@
 - 2026-10-16 App 1.6.2：首页IP和气泡整体适度下移，最大32dp并按陪伴标语/统计面板剩余空间限制位移，默认态大小不变；所有首页提醒/问候/日记提醒气泡删除主标题，仅保留15sp、CompanionMuted色的提示正文及原按钮。同步记录见工作区output/lookbuddy-home-spacing/sync-result.json。
 
 - 2026-10-16 App 1.6.3 首页提醒气泡重排：正文采用深色15sp/24sp行高并增加背景对比度，取消固定155dp高度，30dp圆角内容自适应卡片；按钮视觉收为80dp宽、约28dp高的小胶囊，仍保留至少44dp点击区域。保留无标题、原按钮动作及IP位置/尺寸。同步记录见工作区output/lookbuddy-bubble-layout/sync-result.json。
+
+- 2026-10-16 桌宠0.3：首页镜像与尺寸减半。已有467 DIP尺寸迁移为233 DIP，只迁移一次并保留右下角位置；七种动作共用窗口等比缩放，原生边框允许像素取整差异。气泡只显示首页实际提示，无提示/确认关闭/首页面板暂隐时明确清空，不再显示动作名称、连接问候或残留文本。Android转发HomeReminderController状态及完成态，2秒心跳、变更即时同步，删除不可见的独立问候对桌宠的影响；办公/晚间默认素材亦与首页原字节一致。24项桌宠测试及7种Electron场景、统一尺寸和提示清空验收通过；Android52项测试及APK构建通过，-r更新当前手机保留数据。当前真机通过USB adb reverse5211和本机127.0.0.1配置与桌宠实测连接，默认夜间状态及空提示已验证；手机拒绝ADB注入点击，未修改安全设置，七种切换在隔离Electron中验证。local.properties/配对令牌不提交。实际桌宠已更新运行。原完整窗口DPI/置顶回归限制仍保留，不宣称通过。同步分支仍codex/android-local-sync，提交及逐文件结果见工作区output/desktop-home-sync/sync-result.json；不更新main/apps/android/apps/desktop/apps/backend。

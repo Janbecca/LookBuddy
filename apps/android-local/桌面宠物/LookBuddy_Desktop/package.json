@@ -1,6 +1,6 @@
 {
   "name": "lookbuddy-desktop",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "LookBuddy 桌面宠物 · 第一轮验收版",
   "main": "electron/main.cjs",

@@ -5,7 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -24,7 +24,8 @@ internal data class DesktopPetSyncRequest(
     val mood: String = "calm",
     val message: String? = null,
     val eventId: String? = null,
-    val defaultScene: String = "idle"
+    val defaultScene: String = "idle",
+    val completed: Boolean = false
 )
 
 internal data class DesktopPetSnapshot(
@@ -56,7 +57,8 @@ internal class DesktopPetSyncRepository(
                     request.eventId?.let { put("event_id", it) }
                     put("working", request.working)
                     put("mood", request.mood)
-                    request.message?.takeIf { it.isNotBlank() }?.let { put("message", it) }
+                    put("message", request.message.orEmpty())
+                    put("completed", request.completed)
                 }.toString()
                 connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
@@ -92,18 +94,19 @@ internal fun DesktopPetSyncEffect(
     working: Boolean,
     message: String?,
     eventId: String? = null,
-    defaultScene: String = "idle"
+    defaultScene: String = "idle",
+    completed: Boolean = false
 ) {
     val inspection = LocalInspectionMode.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val repository = remember { DesktopPetSyncRepository() }
-    LaunchedEffect(scene, working, message, eventId, defaultScene, inspection) {
+    LaunchedEffect(scene, working, message, eventId, defaultScene, completed, inspection) {
         if (inspection || BuildConfig.LOOKBUDDY_DESKTOP_URL.isBlank()) return@LaunchedEffect
         while (currentCoroutineContext().isActive) {
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                repository.sync(DesktopPetSyncRequest(scene, working, message = message, eventId = eventId, defaultScene = defaultScene))
+                repository.sync(DesktopPetSyncRequest(scene, working, message = message, eventId = eventId, defaultScene = defaultScene, completed = completed))
             }
-            delay(15_000)
+            delay(2_000)
         }
     }
 }

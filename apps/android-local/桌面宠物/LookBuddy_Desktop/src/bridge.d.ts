@@ -19,6 +19,7 @@ type DesktopSyncSnapshot = {
   scene_action_id?: string;
   scene_event_id?: string;
   scene_message?: string;
+  scene_completed?: boolean;
 };
 interface Window {
   lookbuddy: {

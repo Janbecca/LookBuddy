@@ -36,3 +36,6 @@ for item in manifest:
     if item['id'] in names: item['name'] = names[item['id']]
 (target / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
 print('Imported', len(manifest)-5, 'original scene WebP files')
+
+import runpy
+runpy.run_path(str(root / 'scripts' / 'import_home_defaults.py'), run_name='__main__')

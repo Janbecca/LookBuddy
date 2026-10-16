@@ -94,11 +94,11 @@ function createSyncServer(options = {}) {
   const onCommand = typeof options.onCommand === 'function' ? options.onCommand : () => ({});
   let server;
   let revision = 0;
-  let sceneState = { scene_action_id: '', scene_event_id: '', scene_message: '' };
+  let sceneState = { scene_action_id: '', scene_event_id: '', scene_message: '', scene_completed: false };
   let reminderTimer;
   let sceneSerial = 0;
   let sceneKey = '';
-  const defaultAction = () => ['evening', 'evening_rain', 'night'].includes(appState.default_scene || appState.scene) ? 'pet-3' : 'pet-1';
+  const defaultAction = () => ['evening', 'evening_rain', 'night'].includes(appState.default_scene || appState.scene) ? 'night' : 'pet-1';
   let appState = {
     client_id: '',
     scene: 'idle',
@@ -162,26 +162,29 @@ function createSyncServer(options = {}) {
       working: Boolean(body.working),
       mood: safeText(body.mood, 40) || 'calm',
       default_scene: safeText(body.default_scene, 80),
-      message: incomingMessage || appState.message,
+      message: incomingMessage,
+      completed: body.completed === true,
       last_seen_at: Date.now(),
     };
     appState.label = safeText(body.label || body.suggestedLabel, 40);
-    if (!reminderTimer) setScene(body, safeText(body.event_id || body.id, 80));
-    const changed = ['client_id', 'scene', 'working', 'mood', 'message'].some(key => previous[key] !== appState[key]);
+    clearTimeout(reminderTimer); reminderTimer = undefined;
+    setScene(body, safeText(body.event_id || body.id, 80));
+    const changed = ['client_id', 'scene', 'working', 'mood', 'message', 'completed', 'default_scene', 'label'].some(key => previous[key] !== appState[key]);
     if (changed || !wasConnected) revision += 1;
-    const displayMessage = !wasConnected
-      ? '手机已连接，我会在桌面陪你~'
-      : incomingMessage && incomingMessage !== previous.message ? incomingMessage : '';
-    return publish(displayMessage ? { display_message: displayMessage } : {});
+    return publish();
   }
 
   function setScene(body, eventId = '') {
     const action = sceneAction(body, defaultAction());
     const key = [body.scene || body.category || body.kind, body.label || body.mood || body.suggestedLabel].join(':');
     // Heartbeats must not restart an already playing scene.
-    if (sceneKey === key && sceneState.scene_action_id === action && (!eventId || sceneState.scene_event_id === eventId)) return;
+    if (sceneKey === key && sceneState.scene_action_id === action && (!eventId || sceneState.scene_event_id === eventId)) {
+      sceneState.scene_message = safeText(body.message, 160);
+      sceneState.scene_completed = body.completed === true;
+      return;
+    }
     sceneKey = key;
-    sceneState = { scene_action_id: action, scene_event_id: eventId || `scene:${++sceneSerial}`, scene_message: safeText(body.message || body.title, 160) };
+    sceneState = { scene_action_id: action, scene_event_id: eventId || `scene:${++sceneSerial}`, scene_message: safeText(body.message, 160), scene_completed: body.completed === true };
     revision += 1;
   }
 
@@ -214,18 +217,18 @@ function createSyncServer(options = {}) {
         return;
       }
       if (url.pathname === '/v1/reminders') {
-        const message = safeText(body.message || body.title, 160) || '该休息一下啦~';
+        const message = safeText(body.message, 160);
         clearTimeout(reminderTimer);
         setScene({ ...body, scene: body.scene || body.category || body.kind, message }, safeText(body.event_id || body.id, 80));
-        // A transient notification returns to the latest App scene. Heartbeats don't interrupt it.
+        // The next Home snapshot takes priority immediately; legacy notifications expire otherwise.
         reminderTimer = setTimeout(() => {
           reminderTimer = undefined;
           sceneKey = '';
-          sceneState = { scene_action_id: defaultAction(), scene_event_id: `scene:${++sceneSerial}`, scene_message: '' };
+          sceneState = { scene_action_id: defaultAction(), scene_event_id: `scene:${++sceneSerial}`, scene_message: appState.message, scene_completed: appState.completed === true };
           revision += 1;
           publish();
         }, options.reminderDurationMs ?? 8000);
-        sendJson(response, 202, { ok: true, accepted: true, desktop: publish({ display_message: message }) });
+        sendJson(response, 202, { ok: true, accepted: true, desktop: publish() });
         return;
       }
       const action = safeText(body.action, 20);
