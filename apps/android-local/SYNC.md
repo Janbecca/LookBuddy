@@ -1,5 +1,7 @@
 # LookBuddy 本地 App 同步
 
+1.3.3-integration（versionCode9）：按用户要求放宽演示登录，手机号/验证码任意输入或留空均可；只在显式开启的 development/competition 生效，production 仍禁用。保留安装级隔离与旧演示账号，验证码不保存。同步目标为 main 和整合分支，不覆盖队友同步分支。
+
 整合版补充：前后端接入工作先在独立 `codex/android-backend-integration` 分支完成，随后按用户授权整合至 `main`，已合入队友 `4b8bd07ff31220f9ad2f8de83409801ac99233c8`，不覆盖本同步分支。详见 `../../docs/android-integration.md`。整合版版本为1.3.2-integration，产品源码不变换目录，增加 SDK36/JDK17 构建入口；手机号仅为明确标注的演示登录，Mark 本轮不录视频。
 
 本目录对应本机 `D:/Everything/Anker/projects/lookbuddy`，与仓库原有的 `apps/android` 分别维护。

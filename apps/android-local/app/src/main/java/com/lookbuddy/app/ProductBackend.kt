@@ -142,9 +142,9 @@ internal class ProductClient(private val context: Context, private val scope: Co
             response.second
         }
     }
-    suspend fun login(phone: String, nickname: String): Boolean {
+    suspend fun login(phone: String, nickname: String, code: String = ""): Boolean {
         return try {
-            val result = JSONObject(request("/v1/auth/demo-phone", "POST", JSONObject().put("phone", phone.trim()).put("installationId", installation)
+            val result = JSONObject(request("/v1/auth/demo-phone", "POST", JSONObject().put("phone", phone.trim()).put("code", code).put("installationId", installation)
                 .put("displayName", nickname.trim().ifEmpty { "体验用户" }), false))
             vault.save(result); session = result; user = result.getJSONObject("user"); error = ""
             sync(); true

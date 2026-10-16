@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
+import pytest
 
 from sqlalchemy import select
 
@@ -23,6 +24,24 @@ def test_demo_disabled_and_never_production(client, monkeypatch):
     monkeypatch.setattr(get_settings(), "demo_login_enabled", True)
     monkeypatch.setattr(get_settings(), "env", "production")
     assert client.post("/v1/auth/demo-phone", json=body).status_code == 403
+
+
+@pytest.mark.parametrize("phone,code", [("", ""), ("abc", "wrong"), ("随便填写！", "随便验证码"), ("123", "000000"), ("   ", "!@#$")])
+def test_demo_accepts_arbitrary_inputs(client, monkeypatch, phone, code):
+    monkeypatch.setattr(get_settings(), "demo_login_enabled", True)
+    body = {"phone": phone, "code": code, "installationId": str(uuid4())}
+    first = client.post("/v1/auth/demo-phone", json=body)
+    assert first.status_code == 200, first.text
+    again = client.post("/v1/auth/demo-phone", json={**body, "code": "different-code"})
+    assert again.status_code == 200
+    assert again.json()["user"]["id"] == first.json()["user"]["id"]
+    monkeypatch.setattr(get_settings(), "env", "production")
+    assert client.post("/v1/auth/demo-phone", json=body).status_code == 403
+
+
+def test_demo_allows_omitting_phone_and_code(client, monkeypatch):
+    monkeypatch.setattr(get_settings(), "demo_login_enabled", True)
+    assert client.post("/v1/auth/demo-phone", json={"installationId": str(uuid4())}).status_code == 200
 
 
 def test_demo_isolation_and_profile(client, monkeypatch):

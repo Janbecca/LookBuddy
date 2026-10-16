@@ -1,6 +1,7 @@
 """Product-page APIs. Demo identity is device scoped and never verifies a phone."""
 from datetime import date, datetime, time, timedelta, timezone
 import hashlib
+import re
 import secrets
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -63,7 +64,8 @@ class GreetingCache(Base):
 
 class DemoPhoneIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    phone: str = Field(pattern=r"^(?:\+86)?1[3-9]\d{9}$")
+    phone: str = Field(default="", description="Demo label only; arbitrary text or empty is accepted")
+    code: str = Field(default="", repr=False, description="Ignored in demo login; never verified or stored")
     installationId: str = Field(min_length=32, max_length=64, pattern=r"^[a-zA-Z0-9-]+$")
     displayName: str = Field(default="体验用户", min_length=1, max_length=80)
 
@@ -117,10 +119,10 @@ compatibility = APIRouter()
 @router.post("/auth/demo-phone", response_model=TokenPair)
 def demo_phone(body: DemoPhoneIn, db: Session = Depends(get_db)):
     settings = get_settings()
-    if not settings.demo_login_enabled or settings.env == "production":
+    if not settings.demo_login_enabled or settings.env not in {"development", "competition"}:
         raise HTTPException(403, "Demo phone login is disabled; it never verifies a phone")
     # Same phone on a different install MUST NOT expose another install's data.
-    phone = body.phone.removeprefix("+86")
+    phone = body.phone.strip().removeprefix("+86")
     identity = hashlib.sha256(f"{body.installationId}:{phone}".encode()).hexdigest()
     if db.get_bind().dialect.name == "sqlite":
         db.execute(text("BEGIN IMMEDIATE"))
@@ -131,7 +133,8 @@ def demo_phone(body: DemoPhoneIn, db: Session = Depends(get_db)):
                     display_name=body.displayName, timezone="Asia/Shanghai")
         db.add(user)
         db.flush()
-        db.add(DemoIdentity(identity_key=identity, user_id=user.id, phone_hint=phone[:3] + "****" + phone[-4:]))
+        hint = phone[:3] + "****" + phone[-4:] if re.fullmatch(r"1[3-9]\d{9}", phone) else "演示账号"
+        db.add(DemoIdentity(identity_key=identity, user_id=user.id, phone_hint=hint))
     else:
         user = db.get(User, row.user_id)
     return issue_tokens(db, user)

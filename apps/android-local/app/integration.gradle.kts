@@ -16,8 +16,8 @@ android {
         // Preserve the product UI's minSdk 26. The original debug client retains 24.
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.3.2-integration"
+        versionCode = 9
+        versionName = "1.3.3-integration"
     }
 
     buildFeatures {

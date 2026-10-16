@@ -29,6 +29,11 @@ class ProductBackendIntegrationTest {
         val vault = MemoryVault()
         val client = ProductClient(context, scope, vault)
         try {
+            for ((phone, code) in listOf("" to "", "abc" to "wrong", "随便填写！" to "任意验证码")) {
+                assertTrue("Demo input should be accepted: $phone", client.login(phone, "产品联调", code))
+                assertTrue(client.user!!.getBoolean("demo"))
+                client.request("/v1/account", "DELETE")
+            }
             assertTrue(client.login("13800000000", "产品联调"))
             assertTrue(client.user!!.getBoolean("demo"))
             vault.value!!.put("accessToken", "expired-test-token")
