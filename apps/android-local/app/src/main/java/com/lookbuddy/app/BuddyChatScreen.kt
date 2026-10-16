@@ -1,6 +1,7 @@
 package com.lookbuddy.app
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -13,7 +14,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -24,8 +26,19 @@ import androidx.compose.ui.draw.innerShadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
@@ -73,7 +86,29 @@ internal fun BuddyChatScreen(
     onPage: (CompanionPage) -> Unit = {},
     designPreview: Boolean = false
 ) {
-    BoxWithConstraints(Modifier.fillMaxSize().testTag("buddy_chat_screen")) {
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val backgroundFocus = remember { FocusRequester() }
+    var inputBounds by remember { mutableStateOf<Rect?>(null) }
+    var screenOrigin by remember { mutableStateOf(Offset.Zero) }
+    BoxWithConstraints(Modifier.fillMaxSize().testTag("buddy_chat_screen")
+        .focusRequester(backgroundFocus).focusable()
+        .onGloballyPositioned { screenOrigin = it.localToWindow(Offset.Zero) }
+        .pointerInput(focusManager, keyboard) {
+            // Observe outside presses without consuming them, so scrolling and navigation still work.
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Final)
+                    val up = event.changes.firstOrNull { it.changedToUpIgnoreConsumed() }
+                    val bounds = inputBounds
+                    if (up != null && bounds != null && !bounds.contains(up.position + screenOrigin)) {
+                        focusManager.clearFocus(force = true)
+                        backgroundFocus.requestFocus()
+                        keyboard?.hide()
+                    }
+                }
+            }
+        }) {
         val s = (maxWidth.value / 393f).coerceAtMost(1.35f)
         val nativeTop = with(LocalDensity.current) { WindowInsets.statusBars.getTop(this).toDp() }
         val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
@@ -112,6 +147,7 @@ internal fun BuddyChatScreen(
                 .padding(horizontal = 14.dp * s, vertical = 19.dp * s)) {
                 BasicTextField(value = state.draft, onValueChange = { state.draft = it },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp * s, max = 144.dp)
+                        .onGloballyPositioned { inputBounds = it.boundsInWindow() }
                         .background(Color(0xFFFBF9F9), RoundedCornerShape(36.dp * s))
                         .innerShadow(RoundedCornerShape(36.dp * s), Shadow(radius = 10.dp * s,
                             color = Color.Black.copy(alpha = .25f), offset = DpOffset(0.dp, 2.dp * s)))
@@ -122,7 +158,7 @@ internal fun BuddyChatScreen(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { state.submit() }),
                     decorationBox = { input ->
-                        Row(Modifier.padding(start = 24.dp, end = 8.dp, top = 16.dp, bottom = 16.dp),
+                        Row(Modifier.padding(start = 24.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                             verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.weight(1f)) {
                                 if (state.draft.isEmpty()) Text("和Buddy聊聊...", color = Color(0xFFAAAAAA),
@@ -130,8 +166,12 @@ internal fun BuddyChatScreen(
                                     modifier = Modifier.padding(start = 30.dp * s))
                                 input()
                             }
-                            if (state.draft.isNotBlank()) TextButton(onClick = { state.submit() },
-                                modifier = Modifier.testTag("chat_send")) { Text("发送", color = CompanionClay) }
+                            IconButton(onClick = { state.submit() }, enabled = state.draft.isNotBlank(),
+                                modifier = Modifier.size(48.dp).testTag("chat_send")) {
+                                Icon(painterResource(R.drawable.ic_chat_send), contentDescription = "发送消息",
+                                    tint = if (state.draft.isNotBlank()) CompanionClay else CompanionMuted.copy(alpha = .4f),
+                                    modifier = Modifier.size(24.dp))
+                            }
                         }
                     })
                 if (!designPreview) Text("聊天还未连接，内容暂留在本页", color = CompanionMuted,

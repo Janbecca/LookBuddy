@@ -3,6 +3,8 @@ package com.lookbuddy.app
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -103,5 +105,47 @@ class BuddyChatTest {
         compose.onNodeWithTag("chat_send").assertIsDisplayed().performClick()
         compose.onNodeWithTag("nav_diary").assertIsDisplayed()
         compose.onNodeWithText("暂未发送").assertExists()
+    }
+
+    @Test fun sendIconIsAlwaysVisibleAndClickMatchesImeSendWithoutDuplicates() {
+        val state = BuddyChatState()
+        compose.setContent { BuddyChatScreen(state) }
+        compose.onNodeWithTag("chat_send").assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithTag("chat_input").performTextInput("  第一条消息  ")
+        compose.onNodeWithContentDescription("发送消息").assertExists()
+        compose.onNodeWithTag("chat_send").assertIsEnabled().performClick()
+        compose.runOnIdle { assertEquals(listOf("第一条消息"), state.unsent.toList()) }
+        compose.onNodeWithTag("chat_send").assertIsNotEnabled().performClick()
+        compose.onNodeWithTag("chat_input").performTextInput("第二条消息")
+        compose.onNodeWithTag("chat_input").performImeAction()
+        compose.runOnIdle {
+            assertEquals(listOf("第一条消息", "第二条消息"), state.unsent.toList())
+            assertEquals("", state.draft)
+        }
+        compose.onAllNodesWithText("暂未发送").assertCountEquals(2)
+    }
+
+    @Test fun tappingBannerOrConversationDismissesKeyboardAndPreservesDraft() {
+        val state = BuddyChatState()
+        var hidden = 0
+        val keyboard = object : SoftwareKeyboardController {
+            override fun show() = Unit
+            override fun hide() { hidden++ }
+        }
+        compose.setContent {
+            CompositionLocalProvider(LocalSoftwareKeyboardController provides keyboard) { BuddyChatScreen(state) }
+        }
+        compose.onNodeWithTag("chat_input").performTextInput("没有发送的草稿")
+        compose.onNodeWithTag("chat_input").assertIsFocused()
+        compose.runOnIdle { hidden = 0 }
+        compose.onNodeWithTag("chat_banner").performTouchInput { click() }
+        compose.onNodeWithTag("chat_input").assertIsNotFocused().assertTextContains("没有发送的草稿")
+        compose.runOnIdle { assertTrue(hidden > 0); hidden = 0 }
+        compose.onNodeWithTag("chat_input").performTouchInput { click() }
+        compose.onNodeWithTag("chat_input").assertIsFocused()
+        compose.runOnIdle { assertEquals(0, hidden) }
+        compose.onNodeWithText(state.opening).performTouchInput { click() }
+        compose.onNodeWithTag("chat_input").assertIsNotFocused()
+        compose.runOnIdle { assertTrue(hidden > 0); assertTrue(state.unsent.isEmpty()) }
     }
 }
