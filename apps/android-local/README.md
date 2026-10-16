@@ -147,16 +147,17 @@ Figma 中 iPhone 状态栏和底部指示条由 Android 原生系统栏替代。
 
 按用户要求，当前连接手机的 lookbuddy_onboarding 偏好已清除并停止旧进程，下次Studio Run从开屏/首次注册开始；心情及工作设置文件 SHA256 未变。源码不会在每次启动自动清除登录。
 
-## Windows 桌宠 MVP
+## Windows 桌宠
 
-`desktop/` 提供透明置顶、可拖拽的 Windows 桌宠，直接播放设计资产中的 45 帧透明 WebP。桌宠在本机 `5211` 端口提供带随机 token 的开发期同步接口；Android 首页在前台时同步工作状态与 GLM 关心语，桌宠收到首次连接或新文案后显示气泡。
+正式桌宠工程位于 `桌面宠物/LookBuddy_Desktop/`，使用 Electron + React + TypeScript，提供透明置顶、动作切换、托盘、缩放和局域网状态同步。桌宠只通过本地网络与 Android App 通信，不直接连接 AWS；App 从 AWS 获得的提醒或状态再经本地 `5211` 接口同步给桌宠。
 
-- 模拟器联调：双击 `desktop/start.bat`，重新构建并安装 App。
-- 真机联调：手机和电脑连接同一 Wi-Fi，双击 `desktop/start-phone.bat`，仅为 Windows 防火墙专用网络放行，然后重新构建安装 App。
-- 桌宠交互：左键拖动、双击对话、右键测试提醒或退出。
-- 本地 URL 与 token 仅写入不提交的 `local.properties`，桌宠 token/位置保存在 `%LOCALAPPDATA%/LookBuddy`。
+- 启动：双击 `桌面宠物/LookBuddy_Desktop/启动 LookBuddy.cmd`。
+- 模拟器访问：`http://10.0.2.2:5211`。
+- 真机访问：手机与电脑连接同一 Wi-Fi，使用桌宠启动日志中的电脑局域网 IP。
+- 桌宠与 App 复用 `%LOCALAPPDATA%/LookBuddy/desktop-token`，请求使用 `X-LookBuddy-Token`。
+- App 在首页前台时每 15 秒交换一次状态；桌宠收到新关心语或提醒时更新气泡。
 
-接口、手动提醒命令和后续 AWS 迁移边界见 [`desktop/README.md`](desktop/README.md)。
+接口和联调方式见 [`桌面宠物/LookBuddy_Desktop/README.md`](桌面宠物/LookBuddy_Desktop/README.md)。
 
 ## 1.5.0 首页提醒与三入口导航
 
