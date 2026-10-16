@@ -1,79 +1,109 @@
-# Android API 调试客户端
+# LookBuddy 工位搭子
 
-登录、配置、提醒、干预 / 表情记录、学习 / 调度解释、日记、删除与 JSON API 控制台均连接真实后端。Android 端已接入官方 eufy App SDK 2.2.7，可读取真实设备、在线状态、事件和缩略图，并在能力检查和人工二次确认后控制隐私模式。手机端不伪造姿态或表情识别；视觉感知仍由 Web / 桌面端的 eufy 裸帧链路提供。
+这份项目基于现有 Compose 工程，新增 Figma 的启动及首次注册流程。最终代码同步在 `D:/Everything/Anker/projects/lookbuddy`，当前工作目录的 `LookBuddy` 保留相同版本副本。请在 Android Studio 打开 `D:/Everything/Anker/projects/lookbuddy`，等待 Gradle 同步后，连接手机并点击 Run ▶。
 
-## 构建和启动
+## 已实现
 
-JDK 17、Android SDK 36、min SDK 24、Gradle 8.13、AGP 8.11.1、Kotlin 2.2.21：
+1. 开屏动画：角色淡入、缩放、轻微浮动，约 2.4 秒后自动进入下一页。
+2. 首次注册：打招呼 → LookBuddy 自我介绍 → 缘分不简单 → 链接设备预告 → buddy 询问 → 手机验证 → 设备连接 → 正式介绍 → 首页-早上-wyr。
+3. 每个对话页的两个回复都进入下一页。Android 返回键可返回上一个注册页。
+4. 昵称、手机号、验证码接受任意字符，也接受空输入。无需点击获取验证码即可登录。
+5. 获取验证码仅显示本地演示反馈，没有接入短信服务。
+6. 昵称页键盘“完成”及收起键盘只保留并显示昵称，只有“我们继续”按钮进入手机验证页。
+7. 设备连接页使用演示设备列表，点击任意连接按钮进入正式介绍，点“嗯嗯好的”进入首页。正式介绍完成后保存首次注册状态和昵称，再次启动播放开屏后直接进入首页。
+8. 晨间首页使用 Figma 原始背景、桌前角色和 SVG 图标；点击统计便当顶部或上滑可展开，点“收起”或下滑可收起，底部中间图标现进入陪伴日记。
+7. 输入键盘出现或屏幕空间不足时页面可以滚动。
 
-```powershell
-cd apps/android
-.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest
-```
+设备列表和统计数据目前是演示数据，点击连接不需要真实蓝牙设备。本次未接入设备 SDK。字体按用户要求使用系统字体。
 
-APK：`app/build/outputs/apk/debug/app-debug.apk`。可用 `adb install -r` 安装到自己的测试设备。当前无已配置的 AVD / 系统镜像，未验证安装、界面操作或 Keystore 在设备上的表现。
+## GLM 关心语气泡
 
-主办方开发指南标注 SDK 本身支持 API 24，官方示例 App 使用 API 26。LookBuddy 使用 API 24 并通过完整构建检查；仍需在 Android 7.0/API 24 真机或模拟器上验证启动、SDK 初始化与核心页面。
+首页 Buddy IP 旁展示 GLM 生成的气泡关心语。后端调用智谱开放平台标准接口（适用于自建应用），返回 `show` 和 `message`；模型失败时使用符合相同规则的固定兜底文案。天气数据第一阶段为明确标注的模拟深圳天气。
 
-macOS / Linux 首次执行 `chmod +x ./gradlew`，之后使用 `./gradlew`；Windows 使用
-`.\gradlew.bat`。脚本保持各平台原生入口，
-文本源码统一 UTF-8；不要对 AAR、APK、JAR、图片或原生 `.so` 做换行转换。
+### 第一阶段（当前）
 
-## eufy App SDK
+- 后端 `backend/app.py`，仅用 Python 标准库，提供 `POST /buddy/greeting`。
+- GLM Base URL / Model / API Key 均通过后端 `.env` 配置，不写入代码、不进入 Android 项目。
+- 使用智谱开放平台标准 API，不使用 Coding Plan 专用额度。
+- 模拟深圳天气三种场景：早间已落座、早间状态未知、下班前正在下雨。
+- 后端校验返回格式（`show` 为 bool、`message` 为 string、`show=true` 时非空）。
+- Android 调用后端，在首页 Buddy IP 旁展示气泡；不阻塞首页加载，避免重组导致重复请求。
 
-连接页按官方 Business Login 顺序调用
-`ESIotKit.start(ESIotAppConfig)` 和 `ESIotKit.setUserConfig(ESIotUserConfig)`。
-需要从赛事账号侧取得：
+### 联调步骤
 
-- `appName`
-- `clientId`
-- `userId`
-- `authorization / token`
-- HTTPS `appDomain`
-- HTTPS `deviceDomain`
-- `presetKey`
+1. 启动后端：`cd backend; copy .env.example .env`（填入 GLM_API_KEY）→ `python app.py`，记下终端显示的局域网 IP（如 `192.168.x.x:5210`）。
+2. 修改 `BuddyGreeting.kt` 中 `BuddyGreetingConfig.EMULATOR_URL`，或直接在 `MorningHomeScreen.kt` 调用 `rememberBuddyGreeting(baseUrl = "http://你的局域网IP:5210")`。
+3. 手机连接与电脑相同的 Wi-Fi，安装调试 APK，打开首页即可看到气泡。
+4. 模拟器无需改 IP，默认 `http://10.0.2.2:5210` 已映射到开发机 localhost。
 
-这些值仅保留在当前进程内，不写入 SharedPreferences、日志或 LookBuddy 后端；
-成功连接后 token 输入框立即清空，主动断开会清空全部输入和 SDK 会话。
+实现：后端 `backend/app.py`；Android `app/src/main/java/com/lookbuddy/app/BuddyGreeting.kt`；气泡集成于 `MorningHomeScreen.kt`。
 
-设备区显示名称、型号、SN、父设备和在线状态。真实账号返回空列表时界面明确显示空状态，
-不会生成演示设备。选中在线设备后可查询过去 24 小时事件并读取事件缩略图。
-隐私模式只在设备在线且物模型声明支持时启用按钮，每次命令都弹出二次确认。
-SDK 未确认、设备离线、能力未就绪、超时或隐私区拦截均显示失败和恢复建议。
+## 心情日历
 
-启动后先配置后端：
+点击晨间首页右上角日历打开暖纸弹窗。当天未记录时，显示开心、平静、有点累、低落四个心情选项；整格可点击，“有点累”使用 Figma 原始打哈欠像素表情。保存后以 400ms 竖轴翻转显示「今日宜缓 / 遇事则缓，事缓则圆」，近期七日中的今日格同步显示所选表情。
 
-- 官方模拟器访问主机：`http://10.0.2.2:8000/`。
-- 真机：同一局域网主机 IP，例如 `http://192.168.1.20:8000/`；后端须按需绑定局域网地址并允许防火墙。仅用于受信调试网，不传真实敏感数据。
-- 正式远端使用 HTTPS。地址只接受 origin，不接受用户密码、路径前缀、查询或 fragment。更换地址清除本地登录，避免把旧令牌发送给新后端。
+心情保存在本机 `lookbuddy_moods`，每个自然日一条。再次打开直接显示日签和已记录心情；「换个心情」可更新当天记录，签文保持不变。未选择即关闭不会写入记录。日期按设备本地日期更新，支持跨月；没有记录的历史日期显示圆点，不生成个人历史数据。签文目前沿用设计稿固定内容。
 
-Debug 允许本机 / 私有 IPv4 网段 HTTP；release 禁止明文，默认远端地址仍是无效占位，不能直接发布。已有浏览器 / 桌面账号可以直接登录，不要重复注册同邮箱。
+点击关闭、遮罩或 Android 返回键均可收起。保存失败留在选择面并允许重试；保存和翻签时防止重复点击，系统关闭动画时改用淡入。小屏幕支持弹窗内容滚动。陪伴日记、陪伴视角和个人设置页已接入，详见 CAMERA_INTEGRATION.md。
 
-## 操作
+实现：`app/src/main/java/com/lookbuddy/app/MoodCalendar.kt`。交互及存储测试：`app/src/test/java/com/lookbuddy/app/MoodCalendarTest.kt`。新增选择面、已记录面、小屏放大字体三张 Compose 截图预览。设计节点：`179:2457`、`146:2224`。
 
-1. 注册 / 登录后，修改久坐 30/60/90 分钟、休息 5/10/15/20 分钟、忙碌与两个提醒开关。两端同账号以服务端偏好为准。
-2. 前台连接 `/v1/stream`，Authorization 请求头携带访问令牌，不放进 URL。消息只触发补查，不把客户端消息当完整业务真相。断线 / 重连及前台每 5 秒间隔补查，后台关闭实时连接和周期轮询；没有后台通知或 Android 悬浮窗。
-3. 待处理提醒先点“显示并登记提醒”，服务端预算通过后再显示正文。接受 / 稍后 10 分钟 / 忽略走同一提醒 ID，服务端幂等。其他端已处理或预算限制会显示失败并刷新，不伪造完成。
-4. live / demo 分别查询干预、表情与奖励。12 种回放复用后端规则，明确标为加速模拟；学习开关只更新 demo。没有表情满意度问卷。
-5. API 控制台支持同后端 `/v1/` GET/POST/PATCH/DELETE，账号接口只能用专用按钮，避免令牌进入结果框。DELETE、demo 重置与账号删除都需确认。设备 / 事件 / 观察 / 抓拍标签等其余 API 可用控制台调试；图片不上传。
-6. 日记按账号时区生成；读取、编辑及删除可用控制台。退出本地立即清理会话，离线时服务器刷新令牌撤销不保证送达。失败删除不会显示成功或清理有效登录。
+## 重新体验首次注册
 
-会话使用 Android Keystore AES-GCM 加密后存入私有偏好，禁用备份，不保存密码或输出请求日志。401 使用受锁保护的单次续期；并发 401 共享刷新，失效刷新清理登录，网络 / 5xx 保留会话，旧刷新不能恢复已退出会话。设备上的加密恢复仍待实测。
-
-架构采用 [Android ViewModel / 状态持有指导](https://developer.android.com/topic/libraries/architecture/viewmodel)：Compose 仅调试控件；ViewModel 持有状态及生命周期操作；Repository / Retrofit 持有网络逻辑；SDK Gateway 独立于域模型。
-
-## 验证
+在手机「设置 → 应用 → LookBuddy → 存储」中清除应用数据。开发时也可执行：
 
 ```powershell
-$env:LOOKBUDDY_ANDROID_INTEGRATION_BASE_URL='http://127.0.0.1:8021/'
-.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+& 'D:/Everything/Anker/Android/platform-tools/adb.exe' shell pm clear com.lookbuddy.app
 ```
 
-应先启动使用独立临时数据库的后端。集成测试创建唯一临时账号，验证配置跨客户端、12 个 demo 回放、实时消息、提醒幂等、学习隔离、日记和重置，最后删除账号。不配置环境变量时该测试跳过。
+## 文件
 
-Windows JDK 17 对中文路径的 Gradle 测试 argfile 存在类加载编码风险；脚本只把非 ASCII 的测试运行时 classpath 复制到 ASCII 临时目录，不移动源文件。APK 构建仍在原项目。
+- `app/src/main/java/com/lookbuddy/app/OnboardingScreen.kt`：启动、对话、输入、动画及本地注册状态。
+- `app/src/main/java/com/lookbuddy/app/MainActivity.kt`：应用入口。
+- `app/src/main/java/com/lookbuddy/app/MorningHomeScreen.kt`：晨间首页和可展开统计便当。
+- `app/src/main/res/drawable-nodpi/lookbuddy_character.png`：Figma 提供的角色原图，保持原始 PNG 和透明背景。
+- `app/src/test/java/com/lookbuddy/app/OnboardingFlowTest.kt`：首次注册交互测试。
+- `app/src/screenshotTest/kotlin/com/lookbuddy/app/StartupScreenshots.kt`：实际 Compose 页面截图。
 
-尚未验收：模拟器 / 真机 UI、设备 Keystore、锁屏与后台恢复、真实赛事凭证鉴权、
-T8171/T8214 设备状态/事件/缩略图/隐私模式效果、正式签名发布。自动化编译和 JVM
-接口测试不替代这些真机验证；执行时填写
-`docs/android-eufy-device-acceptance.md`。
+## 本机编译与验证
+
+保留原工程的 SDK、Gradle、Kotlin 和 Compose 版本。当前 SDK 位置由 `local.properties` 指向 `D:/Everything/Anker/Android`；换电脑时由 Android Studio 设置本机 SDK 路径。
+
+```powershell
+$env:JAVA_HOME='D:/Everything/Anker/Android studio/jbr'
+./gradlew.bat :app:assembleDebug
+./gradlew.bat :app:testDebugUnitTest
+./gradlew.bat :app:updateDebugScreenshotTest
+```
+
+调试 APK 在 `app/build/outputs/apk/debug/app-debug.apk`。截图在 `app/src/screenshotTestDebug/reference`，可用于检查系统字体版本下的布局。
+
+1.1 版已验证：调试 APK 编译成功；5 个注册流程测试和 2 个统计便当交互测试通过；新增设备连接、正式介绍、晨间首页、便当展开及填写昵称后的截图已渲染并核对。Windows 下截图和本地测试工具需要英文项目路径，请使用上述 D 盘主工程运行这些命令。
+
+从 1.0 更新时会重新展示注册流程，便于体验新增设备连接及正式介绍页面。调试 APK 可直接覆盖安装，保留本机数据。
+
+## 设计来源
+
+https://www.figma.com/design/MrMMdAMDddch9OUQz9NIVQ/Untitled?node-id=0-1
+
+| 页面 | Figma 节点 |
+| --- | --- |
+| 开屏动画页 | 1:2 |
+| 首次注册-打招呼 | 16:962 |
+| 首次注册-LookBuddy自我介绍 | 16:989 |
+| 首次注册-缘分不简单 | 16:1011 |
+| 首次注册-链接设备预告 | 21:1039 |
+| 首次注册-buddy询问 | 23:1384 |
+| 首次注册-手机验证 | 23:1412 |
+| 首次注册-设备连接页 | 21:1060 |
+| 首次注册-正式介绍页 | 23:1246 |
+| 首页-早上-wyr | 114:4399 |
+| 首页-早上-wyr / 统计便当展开 | 142:2144 |
+
+Figma 中 iPhone 状态栏和底部指示条由 Android 原生系统栏替代。角色各页使用同一原图，以 `ContentScale.Crop` 呈现在原稿 168 × 186 的图层槽位中。
+
+
+## 陪伴日记、陪伴视角与个人设置
+
+三个页面现已接入主 App。首页右上角摄像头打开陪伴视角，底部中间打开陪伴日记，右侧打开个人设置。摄像头使用可替换的 CameraFeed 接口，当前默认显示待连接状态；真实设备、实时识别和录像由后续适配器接入。日记是明确标记的设计稿示例，昵称修改保存在本机。入口、接口契约和验证方式见 [CAMERA_INTEGRATION.md](CAMERA_INTEGRATION.md)。
+
