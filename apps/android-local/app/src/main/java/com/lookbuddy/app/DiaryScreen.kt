@@ -44,8 +44,7 @@ import kotlin.math.roundToInt
 
 internal data class DiaryEntry(val time: String, val title: String, val description: String, val category: String, val cropY: Float)
 
-/** Explicit Figma example day; no personal history is fabricated for other dates. */
-internal val DiaryExampleDate: LocalDate = LocalDate.of(2026, 10, 13)
+/** Design examples are available only after explicitly selecting the example diary. */
 internal val DiaryExampleEntries = listOf(
     DiaryEntry("08:05", "展示今日OOTD", "新的工作日，带着好心情出发。", "到岗", .109f),
     DiaryEntry("10:10", "端起了水杯", "回应了今天的第3次饮水提醒。", "饮水", .286f),
@@ -59,8 +58,11 @@ internal val DiaryExampleEntries = listOf(
 
 @Composable
 internal fun DiaryScreen(s: Float) {
-    var dateText by rememberSaveable { mutableStateOf(DiaryExampleDate.toString()) }
-    val date = LocalDate.parse(dateText)
+    val today = rememberAppTime().toLocalDate()
+    var dateText by rememberSaveable { mutableStateOf<String?>(null) }
+    var example by rememberSaveable { mutableStateOf(false) }
+    val date = dateText?.let { LocalDate.parse(it) } ?: today
+    val showExample = example
     var detail by remember { mutableStateOf<DiaryEntry?>(null) }
     val context = LocalContext.current
     val scroll = rememberScrollState()
@@ -73,7 +75,11 @@ internal fun DiaryScreen(s: Float) {
             Text(date.format(DateTimeFormatter.ofPattern("M月d日 · E", Locale.CHINA)),
                 color = CompanionMuted, fontSize = (11 * s).sp)
         }
-        if (date == DiaryExampleDate) BuddyDiaryCarousel(s)
+        if (showExample) {
+            Text("设计稿示例 · 非真实时间记录", color = CompanionMuted, fontSize = 12.sp)
+            TextButton(onClick = { example = false; dateText = null }) { Text("返回今天", color = CompanionClay) }
+            BuddyDiaryCarousel(s)
+        }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("工位日记", color = CompanionInk, fontSize = (20 * s).sp, lineHeight = (29 * s).sp)
@@ -82,15 +88,15 @@ internal fun DiaryScreen(s: Float) {
             }
             Box(Modifier.size(48.dp * s).clickable(role = Role.Button) {
                 DatePickerDialog(context, { _, year, month, day ->
-                    dateText = LocalDate.of(year, month + 1, day).toString()
+                    example = false; dateText = LocalDate.of(year, month + 1, day).toString()
                 }, date.year, date.monthValue - 1, date.dayOfMonth).apply {
-                    datePicker.maxDate = LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
+                    datePicker.maxDate = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
                 }.show()
             }.semantics { contentDescription = "选择日记日期" }.testTag("diary_date"), contentAlignment = Alignment.Center) {
                 FigmaSvg("diary_calendar", s, folder = "pages")
             }
         }
-        if (date == DiaryExampleDate) {
+        if (showExample) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp * s)) {
                 DiaryExampleEntries.forEachIndexed { i, entry -> DiaryTimelineEntry(entry, i, s) { detail = entry } }
             }
@@ -100,7 +106,7 @@ internal fun DiaryScreen(s: Float) {
                 Text("这一天还没有记录", color = CompanionInk, fontSize = 18.sp)
                 Spacer(Modifier.height(12.dp))
                 Text("和 Buddy 一起，慢慢积攒日常的小事。", color = CompanionMuted, fontSize = 12.sp)
-                TextButton(onClick = { dateText = DiaryExampleDate.toString() }) { Text("看看示例日记", color = CompanionClay) }
+                TextButton(onClick = { example = true }) { Text("看看示例日记", color = CompanionClay) }
             }
         }
     }

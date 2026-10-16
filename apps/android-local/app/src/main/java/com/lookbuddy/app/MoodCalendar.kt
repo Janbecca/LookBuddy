@@ -79,39 +79,23 @@ internal fun MorningHomeScreen(
     previewRecords: Map<LocalDate, Mood>? = null,
     onCamera: () -> Unit = {},
     onDiary: () -> Unit = {},
-    onSettings: () -> Unit = {}
+    onSettings: () -> Unit = {},
+    previewTime: java.time.LocalDateTime? = null
 ) {
     val context = LocalContext.current
     val store = remember(context) { MoodStore(context) }
-    var date by remember { mutableStateOf(previewDate ?: LocalDate.now()) }
+    val now = rememberAppTime(previewTime ?: previewDate?.atTime(9, 0))
+    val date = now.toLocalDate()
     var open by rememberSaveable { mutableStateOf(initialCalendarOpen) }
     var records by remember(date) { mutableStateOf(previewRecords ?: store.week(date)) }
-    val owner = LocalLifecycleOwner.current
-    DisposableEffect(owner, previewDate) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && previewDate == null) {
-                date = LocalDate.now()
-                records = store.week(date)
-            }
-        }
-        owner.lifecycle.addObserver(observer)
-        onDispose { owner.lifecycle.removeObserver(observer) }
-    }
-    LaunchedEffect(previewDate) {
-        if (previewDate == null) while (true) {
-            delay(30_000)
-            date = LocalDate.now()
-        }
-    }
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().then(if (open) Modifier.blur(2.dp).clearAndSetSemantics {} else Modifier)) {
             // previewDate 非空时为测试 / 预览模式，跳过 GLM 气泡请求避免网络干扰
             MorningHomeContent(initialExpanded, greetingScene = if (previewDate != null) null else "morning_seated",
                 onCamera = onCamera, onDiary = onDiary, onSettings = onSettings, onCalendar = {
-                date = previewDate ?: LocalDate.now()
                 records = previewRecords ?: store.week(date)
                 open = true
-            })
+            }, now = now)
         }
         if (open) key(date) {
             val recordDate = date
@@ -161,7 +145,7 @@ internal fun MoodCalendar(
                 .padding(horizontal = 24.dp * s, vertical = 22.dp * s),
                 verticalArrangement = Arrangement.spacedBy(16.dp * s)) {
                 CalendarDate(date, s)
-                Column(Modifier.fillMaxWidth().height((if (choosing) 168 else 110).dp * s)
+                Column(Modifier.fillMaxWidth().heightIn(min = (if (choosing) 168 else 110).dp * s)
                     .graphicsLayer { rotationY = rotation.value; cameraDistance = 16 * density; this.alpha = alpha.value },
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     if (choosing) {
@@ -235,7 +219,7 @@ internal fun MoodCalendar(
 
 @Composable
 private fun CalendarDate(date: LocalDate, s: Float) {
-    Row(Modifier.fillMaxWidth().height(58.dp * s), verticalAlignment = Alignment.CenterVertically,
+    Row(Modifier.fillMaxWidth().heightIn(min = 58.dp * s), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp * s)) {
         Text(date.dayOfMonth.toString(), color = CalendarInk, fontSize = (44 * s).sp, lineHeight = (58 * s).sp)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp * s)) {
@@ -255,8 +239,8 @@ internal fun MoodIcon(mood: Mood, s: Float) = FigmaSvg(mood.asset, s, folder = "
 @Composable
 private fun CalendarWeek(date: LocalDate, records: Map<LocalDate, Mood>, s: Float) {
     val format = remember { DateTimeFormatter.ofPattern("MM.dd") }
-    Column(Modifier.fillMaxWidth().height(101.dp * s), verticalArrangement = Arrangement.spacedBy(12.dp * s)) {
-        Row(Modifier.fillMaxWidth().height(16.dp * s), horizontalArrangement = Arrangement.SpaceBetween) {
+    Column(Modifier.fillMaxWidth().testTag("calendar_week"), verticalArrangement = Arrangement.spacedBy(12.dp * s)) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 16.dp * s), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("这一周的心情", color = CalendarMuted, fontSize = (11 * s).sp)
             Text("${date.minusDays(6).format(format)} — ${date.format(format)}", color = CalendarMuted, fontSize = (10 * s).sp)
         }
@@ -265,10 +249,10 @@ private fun CalendarWeek(date: LocalDate, records: Map<LocalDate, Mood>, s: Floa
                 val day = date.minusDays(days)
                 val today = days == 0L
                 val mood = records[day]
-                Column(Modifier.weight(1f).height(73.dp * s)
+                Column(Modifier.weight(1f).heightIn(min = 73.dp * s)
                     .background(if (today) Color(0xFFF7EDDE) else Color.Transparent, RoundedCornerShape(10.dp * s))
                     .then(if (today) Modifier.border(.75.dp, Color(0x99C49661), RoundedCornerShape(10.dp * s)) else Modifier)
-                    .padding(top = 5.dp * s).testTag("mood_day_$day")
+                    .padding(vertical = 5.dp * s).testTag("mood_day_$day")
                     .semantics { contentDescription = "$day，${mood?.label ?: "未记录"}" },
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp * s)) {
                     Text(listOf("一", "二", "三", "四", "五", "六", "日")[day.dayOfWeek.value - 1],

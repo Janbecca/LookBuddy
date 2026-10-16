@@ -52,6 +52,19 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val schedule = rememberWorkSchedule()
+    val scheduleStore = remember(context) { WorkScheduleStore(context) }
+    var scheduleError by remember { mutableStateOf<String?>(null) }
+    fun pickWorkTime(start: Boolean) {
+        val time = if (start) schedule.start else schedule.end
+        android.app.TimePickerDialog(context, { _, hour, minute ->
+            val selected = java.time.LocalTime.of(hour, minute)
+            val nextStart = if (start) selected else schedule.start
+            val nextEnd = if (start) schedule.end else selected
+            if (nextStart == nextEnd) scheduleError = "上班与下班时间不能相同。"
+            else { scheduleStore.save(WorkSchedule(nextStart, nextEnd)); scheduleError = null }
+        }, time.hour, time.minute, true).show()
+    }
     val replayIntroduction = LocalReplayIntroduction.current
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
@@ -128,11 +141,22 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
     dialog?.let { selected ->
         AlertDialog(onDismissRequest = { if (!saving) dialog = null }, containerColor = CompanionPaper,
             title = { Text(selected, color = CompanionInk) },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when (selected) {
                     "账号安全" -> Text("当前为本地体验，尚未接入真实账号登录。昵称和心情记录保存在这台设备上。", color = CompanionMuted)
                     "系统设置" -> Text("可在 Android 应用设置中管理 LookBuddy 的权限、通知和存储。", color = CompanionMuted)
                     "设备连接" -> Text("在陪伴视角查看摄像头连接状态、原视频和记录高光时刻。", color = CompanionMuted)
+                }
+                if (selected == "系统设置") {
+                    Text("工作时间（每日）", color = CompanionInk)
+                    TextButton(onClick = { pickWorkTime(true) }, modifier = Modifier.testTag("work_start_time")) {
+                        Text("上班时间  ${schedule.start}", color = CompanionClay)
+                    }
+                    TextButton(onClick = { pickWorkTime(false) }, modifier = Modifier.testTag("work_end_time")) {
+                        Text("下班时间  ${schedule.end}", color = CompanionClay)
+                    }
+                    Text("到点自动切换上下班；18:00 至次日 06:00 使用晚间背景。", color = CompanionMuted, fontSize = 12.sp)
+                    scheduleError?.let { Text(it, color = CompanionClay) }
                 }
                 if (selected == "系统设置") TextButton(onClick = {
                     dialog = null

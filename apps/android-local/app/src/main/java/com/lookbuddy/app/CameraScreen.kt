@@ -58,10 +58,7 @@ internal fun CameraScreen(feed: CameraFeed, s: Float, previewTime: LocalDateTime
         if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) feed.start()
         onDispose { owner.lifecycle.removeObserver(observer); feed.stop() }
     }
-    var time by remember { mutableStateOf(previewTime ?: LocalDateTime.now()) }
-    LaunchedEffect(previewTime) {
-        if (previewTime == null) while (true) { time = LocalDateTime.now(); delay(1000) }
-    }
+    val time = rememberAppTime(previewTime)
     var saving by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()

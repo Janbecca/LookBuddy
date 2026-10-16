@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -107,10 +108,17 @@ internal fun MorningHomeContent(
     greetingScene: String? = "morning_seated",
     onCamera: () -> Unit = {},
     onDiary: () -> Unit = {},
-    onSettings: () -> Unit = {}
+    onSettings: () -> Unit = {},
+    now: java.time.LocalDateTime = rememberAppTime(),
+    schedule: WorkSchedule = rememberWorkSchedule()
 ) {
     var expanded by rememberSaveable { mutableStateOf(initialExpanded) }
-    var working by rememberSaveable { mutableStateOf(true) }
+    val status = schedule.status(now)
+    val night = isNightTime(now.toLocalTime())
+    val working = status.working
+    val context = LocalContext.current
+    val inspection = androidx.compose.ui.platform.LocalInspectionMode.current
+    val companionDays = remember(now.toLocalDate(), inspection) { if (inspection) 1L else WorkScheduleStore(context).companionDays(now.toLocalDate()) }
     val scope = rememberCoroutineScope()
     val drawerMotion = remember { StatisticsDrawerMotion(expanded, scope) }
     BoxWithConstraints(Modifier.fillMaxSize().clipToBounds().testTag("morning_home")) {
@@ -122,7 +130,8 @@ internal fun MorningHomeContent(
         val drawerProgress = drawerMotion.progress
         val drawerHeight = (183f + 255f * drawerProgress).dp * s
 
-        Image(painterResource(R.drawable.home_room), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        Image(painterResource(if (night) R.drawable.home_room_night else R.drawable.home_room), null,
+            Modifier.fillMaxSize().testTag(if (night) "night_background" else "day_background"), contentScale = ContentScale.Crop)
         if (drawerProgress < 1f) {
             FigmaSvg("top_curve", s, Modifier.offset(x = (310.55f * s).dp, y = (-417.4f * s).dp)
                 .graphicsLayer { alpha = 1f - drawerProgress })
@@ -143,7 +152,7 @@ internal fun MorningHomeContent(
                     Row(Modifier.weight(1f).fillMaxHeight()
                         .background(if (working == isWork) BuddyCream.copy(alpha = 0.6f) else Color.Transparent,
                             RoundedCornerShape(28.dp))
-                        .clickable(role = Role.Button) { working = isWork }.testTag(if (isWork) "work_mode" else "offwork_mode"),
+                        .semantics { this.selected = working == isWork }.testTag(if (isWork) "work_mode" else "offwork_mode"),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                         FigmaSvg(if (isWork) "work" else "offwork", s)
                         Spacer(Modifier.width(6.dp * s))
@@ -153,14 +162,20 @@ internal fun MorningHomeContent(
             }
             Row(Modifier.fillMaxWidth().height(32.dp * s).padding(horizontal = 11.dp * s),
                 verticalAlignment = Alignment.CenterVertically) {
-                WorkTime("已上班", "8：00", s)
+                WorkTime("已上班", displayDuration(status.elapsedMinutes), s)
                 Box(Modifier.weight(1f).padding(horizontal = 5.dp * s).height(13.dp * s)
-                    .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(8.dp)))
-                WorkTime("距下班时间", "8：00", s)
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(8.dp))) {
+                    Box(Modifier.fillMaxHeight().fillMaxWidth(status.progress).background(BuddyCream.copy(alpha = .6f)))
+                }
+                WorkTime("距下班时间", displayDuration(status.remainingMinutes), s)
             }
-            Spacer(Modifier.height(19.dp * s))
-            Box(Modifier.fillMaxWidth().height(277.dp * s).clipToBounds()) {
-                Image(painterResource(R.drawable.home_buddy_desk), "LookBuddy 在桌前陪你工作",
+            Spacer(Modifier.height((if (night) 31 else 19).dp * s))
+            Box(Modifier.fillMaxWidth().height((if (night) 343 else 277).dp * s).clipToBounds()) {
+                if (night) Image(painterResource(R.drawable.home_buddy_night), "LookBuddy 回家休息",
+                    Modifier.align(Alignment.TopStart).wrapContentSize(Alignment.TopStart, unbounded = true).requiredSize(514.dp * s, 369.dp * s)
+                        .offset(x = (-58).dp * s, y = (-38).dp * s), contentScale = ContentScale.Fit)
+                else Image(painterResource(R.drawable.home_buddy_desk), "LookBuddy 在桌前陪你工作",
                     Modifier.align(Alignment.TopCenter).offset(x = (-6).dp * s)
                         .requiredSize(353.dp * s, 290.dp * s), contentScale = ContentScale.Crop)
                 // GLM 关心语气泡：在 Buddy IP 旁展示，不阻塞首页加载。
@@ -182,14 +197,14 @@ internal fun MorningHomeContent(
             }
         }
         if (drawerProgress < 1f) {
-            Text("一起工作的第100天也要加油呀~", color = HomeInk, fontSize = (16 * s).sp,
+            Text("一起陪伴的第${companionDays}天，也要照顾好自己~", color = HomeInk, fontSize = (16 * s).sp,
                 letterSpacing = (2.2f * s).sp, lineHeight = (30 * s).sp, textAlign = TextAlign.Center,
                 modifier = Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = 1f - drawerProgress }
                     .padding(bottom = navHeight + bottomInset + drawerHeight + 18.dp * s)
                     .fillMaxWidth().padding(horizontal = 20.dp * s))
         }
         StatisticsDrawer(expanded, drawerMotion, s, Modifier.align(Alignment.BottomCenter)
-            .padding(bottom = navHeight + bottomInset).height(drawerHeight)) { expanded = it }
+            .padding(bottom = navHeight + bottomInset).height(drawerHeight), now.toLocalDate()) { expanded = it }
         Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.White)
             .padding(bottom = bottomInset).height(navHeight).padding(horizontal = 28.dp * s),
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -230,6 +245,7 @@ private fun StatisticsDrawer(
     motion: StatisticsDrawerMotion,
     s: Float,
     modifier: Modifier,
+    today: java.time.LocalDate,
     onExpand: (Boolean) -> Unit
 ) {
     val shape = RoundedCornerShape(topStart = 20.dp * s, topEnd = 20.dp * s)
@@ -318,7 +334,7 @@ private fun StatisticsDrawer(
                     FigmaSvg("sun", s)
                     Spacer(Modifier.width(10.dp * s))
                     Text("距周末还有", color = Color(0xFFAB5E3B), fontSize = (14 * s).sp, modifier = Modifier.weight(1f))
-                    Text("3", color = Color(0xFFAB5E3B), fontSize = (30 * s).sp, fontWeight = FontWeight.Bold)
+                    Text(daysUntilWeekend(today).toString(), color = Color(0xFFAB5E3B), fontSize = (30 * s).sp, fontWeight = FontWeight.Bold)
                     Text(" 天", color = Color(0xFFAB5E3B), fontSize = (14 * s).sp)
                 }
                 Spacer(Modifier.height(24.dp * s))
@@ -337,7 +353,7 @@ private fun PrimaryStatistics(s: Float) {
             Spacer(Modifier.height(10.dp * s))
             Text("专注工作", color = HomeMuted, fontSize = (12 * s).sp)
             Spacer(Modifier.height(10.dp * s))
-            Text("6h 30min", color = HomeInk, fontSize = (18 * s).sp, fontWeight = FontWeight.Bold)
+            Text("待记录", color = HomeInk, fontSize = (18 * s).sp, fontWeight = FontWeight.Bold)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp * s)) {
             Row(Modifier.fillMaxWidth().height(46.dp * s).background(Color(0xFFFFF5EA), RoundedCornerShape(14.dp))
@@ -384,7 +400,7 @@ private fun SupplementaryStatistics(s: Float) {
             }
             Spacer(Modifier.height(12.dp * s))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("1888", color = HomeInk, fontSize = (32 * s).sp, fontWeight = FontWeight.Bold)
+                Text("--", color = HomeInk, fontSize = (32 * s).sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(7.dp * s))
                 Text("小时", color = Color(0xFF7A6657), fontSize = (13 * s).sp)
             }
@@ -400,7 +416,7 @@ private fun SupplementaryStatistics(s: Float) {
                 FigmaSvg("moon", s)
                 Spacer(Modifier.width(6.dp * s))
                 Text("今日小憩", color = Color(0xFF7A6657), fontSize = (12 * s).sp, modifier = Modifier.weight(1f))
-                Text("30min", color = HomeInk, fontSize = (16 * s).sp, fontWeight = FontWeight.Bold)
+                Text("待记录", color = HomeInk, fontSize = (16 * s).sp, fontWeight = FontWeight.Bold)
             }
         }
     }

@@ -51,6 +51,7 @@ class CompanionPagesTest {
 
     @Test fun diaryScrollsToLastEntryAndOpensHonestPreview() {
         compose.setContent { LookBuddyApp(CompanionPage.Diary) }
+        compose.onNodeWithText("看看示例日记").performScrollTo().performClick()
         compose.onNodeWithTag("diary_bubbles").performTouchInput { swipeUp() }
         compose.onNodeWithTag("diary_entry_7").performScrollTo().performClick()
         compose.onNodeWithText("18:05 · 挥手下班").assertIsDisplayed()

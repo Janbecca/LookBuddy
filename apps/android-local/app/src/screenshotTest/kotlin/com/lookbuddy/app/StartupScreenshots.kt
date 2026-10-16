@@ -89,7 +89,7 @@ internal fun loadSvgForLayoutlib(assets: AssetManager, filename: String): SVG {
 @Composable
 private fun ScreenshotHome(expanded: Boolean) {
     CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib) {
-        MorningHomeScreen(initialExpanded = expanded)
+        MorningHomeScreen(initialExpanded = expanded, previewDate = java.time.LocalDate.of(2026, 10, 16))
     }
 }
 
@@ -124,5 +124,25 @@ fun CompactMoodSelectionScreenshot() {
     CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib) {
         MorningHomeScreen(initialCalendarOpen = true, previewDate = calendarPreviewDate,
             previewRecords = emptyMap())
+    }
+}
+
+@PreviewTest
+@Preview(widthDp = 393, heightDp = 852, showSystemUi = true)
+@Composable
+fun EveningHomeScreenshot() {
+    CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib) {
+        MorningHomeScreen(previewDate = java.time.LocalDate.of(2026, 10, 16),
+            previewTime = java.time.LocalDateTime.of(2026, 10, 16, 19, 0))
+    }
+}
+
+@PreviewTest
+@Preview(widthDp = 320, heightDp = 640, fontScale = 1.5f, showSystemUi = true)
+@Composable
+fun CompactMoodFortuneScreenshot() {
+    CompositionLocalProvider(LocalHomeSvgLoader provides ::loadSvgForLayoutlib) {
+        MorningHomeScreen(initialCalendarOpen = true, previewDate = calendarPreviewDate,
+            previewRecords = calendarPreviewRecords() + (calendarPreviewDate to Mood.Tired))
     }
 }

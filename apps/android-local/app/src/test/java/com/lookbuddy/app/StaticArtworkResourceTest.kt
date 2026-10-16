@@ -16,6 +16,11 @@ class StaticArtworkResourceTest {
 
     @Test fun allStartupPagesShareARealPngPlaceholder() = assertPng(R.drawable.onboarding_buddy_placeholder)
 
+    @Test fun eveningAssetsAreRealPngs() {
+        assertPng(R.drawable.home_room_night)
+        assertPng(R.drawable.home_buddy_night)
+    }
+
     private fun assertPng(resourceId: Int) {
         val resources = ApplicationProvider.getApplicationContext<Context>().resources
         val header = resources.openRawResource(resourceId).use { input ->
