@@ -27,19 +27,16 @@ class MoodCalendarTest {
         context.getSharedPreferences("lookbuddy_moods", Context.MODE_PRIVATE).edit().clear().commit()
     }
 
-    @Test fun unsupportedVisualChoicesNeverSaveOrEnterTheCloudMoodContract() {
-        var saves = 0
-        compose.setContent { MoodCalendar(date, emptyMap(), {}, onSave = { saves++; true }) }
-        for ((key, label) in listOf("Curious" to "好奇", "Thoughtful" to "思考", "Excited" to "振奋")) {
-            compose.onNodeWithTag("mood_$key").performScrollTo().performClick()
-            compose.onNodeWithTag("mood_unconnected").performScrollTo()
-                .assertTextEquals("${label}暂未接入，不会保存记录")
-            compose.onNodeWithTag("daily_fortune").assertDoesNotExist()
-            assertEquals(0, saves)
-            assertNull(MoodStore(context).read(date))
-        }
-        assertEquals(setOf("Happy", "Calm", "Tired", "Sad"), Mood.entries.map { it.name }.toSet())
-        compose.onNodeWithTag("mood_Tired").performScrollTo().assertIsDisplayed()
+    @Test fun newMoodChoicePersistsAndShowsFortuneOnlyAfterSuccess() {
+        compose.setContent { MorningHomeScreen(previewDate = date) }
+        compose.onNodeWithContentDescription("心情日历").performClick()
+        compose.onNodeWithTag("mood_Curious").performScrollTo().performClick()
+        compose.waitUntil(10_000) { MoodStore(context).read(date) == Mood.Curious }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithTag("mood_unconnected").assertDoesNotExist()
+        compose.onNodeWithTag("recorded_mood").assertTextEquals("轻轻记下了 · 好奇")
+        assertEquals(7, Mood.entries.size)
     }
 
     @Test fun calendarDismissWithoutChoosingDoesNotWriteAndReopensOnSelection() {

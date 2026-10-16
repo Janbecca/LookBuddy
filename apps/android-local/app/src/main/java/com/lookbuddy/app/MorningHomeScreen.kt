@@ -116,6 +116,8 @@ internal fun MorningHomeContent(
     reminders: HomeReminderController? = null,
     onReminderAcknowledged: (String) -> Unit = {},
     onReminderChat: (HomeReminderEvent) -> Unit = {},
+    onReminderRespond: (String, HomeReminderResponse) -> Unit = { _, _ -> },
+    onReminderDiary: (HomeReminderEvent) -> Unit = { onDiary() },
     desktopSyncVisible: Boolean = true
 ) {
     var expanded by rememberSaveable { mutableStateOf(initialExpanded) }
@@ -181,7 +183,7 @@ internal fun MorningHomeContent(
             y = (sceneOrigin + sceneDrop).dp).testTag("home_ip_bubble_group")) {
             HomeBuddyArtwork(controller, workPlayback, night, sceneScale, sceneScale)
             HomeReminderBubble(controller, drawerProgress > .001f, sceneScale, sceneScale,
-                onReminderAcknowledged, onReminderChat, onDiary)
+                onReminderAcknowledged, onReminderChat, onDiary, onReminderRespond, onReminderDiary)
             // Keep main's authenticated greeting, positioned with the new scene and hidden by the drawer.
             if (greetingScene != null) {
                 if (greeting.show && greeting.message.isNotBlank() && controller.active == null && drawerProgress <= .001f) {

@@ -329,9 +329,15 @@ class SnapshotResponse(ApiModel):
     intervention: InterventionPublic | None = None
 
 
+class DisplayClaimIn(ApiModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    claim_id: str = Field(alias="claimId", min_length=8, max_length=96, pattern=r"^[a-zA-Z0-9:_-]+$")
+
+
 class ReminderRespondRequest(ApiModel):
     action: Literal["accepted", "snoozed", "ignored"]
     snooze_minutes: int | None = Field(default=None, alias="snoozeMinutes", ge=1, le=120)
+    claim_id: str | None = Field(default=None, alias="claimId", min_length=8, max_length=96, pattern=r"^[a-zA-Z0-9:_-]+$")
 
 
 class DiaryCandidate(ApiModel):

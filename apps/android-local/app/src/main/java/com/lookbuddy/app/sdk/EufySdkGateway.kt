@@ -12,6 +12,7 @@ import com.anker.esiotkit.domain.model.MegaEvent
 import com.anker.esiotkit.domain_thing.model.interaction.ThingPayload
 import com.anker.esiotkit.event.model.EventCondition
 import com.anker.esiotkit.manager.MegaEventManager
+import com.anker.esiotkit.media.event_stream.EventMediaPlayer
 import com.anker.esiotkit.mega.category.Category
 import java.util.concurrent.ConcurrentHashMap
 import java.security.MessageDigest
@@ -91,6 +92,8 @@ data class DeviceEventPayload(
     val hasThumbnail: Boolean,
 )
 
+data class DiaryDeviceMedia(val key: String, val kind: String, val role: String)
+data class DiaryDeviceEvent(val providerEventId: String, val capturedAt: Instant, val media: List<DiaryDeviceMedia>)
 data class DeviceEventEvidence(val method: String = "eufy_app_sdk")
 data class DeviceEventPrivacy(
     val containsImage: Boolean = false,
@@ -98,6 +101,94 @@ data class DeviceEventPrivacy(
 )
 
 class RealEufySdkGateway(context: Context) : EufySdkGateway {
+    private var diaryEpoch = 0
+    val diaryConnected: Boolean get() = initialized
+
+    /** Snapshot only; the SDK's native event never leaves the device. */
+    suspend fun fetchDiaryEvents(deviceSn: String, start: Long, end: Long): List<DiaryDeviceEvent> {
+        val raw = queryDiaryEvents(deviceSn, start, end)
+        return raw.map { event ->
+            val media = mutableListOf<DiaryDeviceMedia>()
+            if (event.thumbnail?.picturePath?.isNotBlank() == true)
+                media.add(DiaryDeviceMedia("thumbnail", "image", "thumbnail"))
+            // Hash opaque picture paths locally; paths themselves are never synchronized.
+            event.pictures.filter { it.picturePath.isNotBlank() }.distinctBy { it.picturePath }.forEach {
+                val key = MessageDigest.getInstance("SHA-256").digest(it.picturePath.toByteArray())
+                    .joinToString("") { b -> "%02x".format(b) }.take(32)
+                media.add(DiaryDeviceMedia("picture_$key", "image", "picture"))
+            }
+            if (event.videoPath.isNotBlank()) media.add(DiaryDeviceMedia("video", "video", "clip"))
+            check(media.size <= 32) { "单条设备事件媒体过多，未同步，请缩小查询范围" }
+            DiaryDeviceEvent(event.megaEventId, Instant.ofEpochMilli(event.startTimestamp), media)
+        }
+    }
+
+    private suspend fun queryDiaryEvents(deviceSn: String, start: Long, end: Long): List<MegaEvent> {
+        checkInitialized()
+        val epoch = diaryEpoch
+        val device = MegaDeviceManager.getDeviceBy(deviceSn) ?: error("当前设备账号无权访问该设备，请重新连接")
+        val condition = EventCondition(_parentSnList = listOf(device.parentSn.ifBlank { deviceSn }),
+            _startTime = start, _endTime = end).setDeviceSnList(listOf(deviceSn)).setCount(100)
+        val all = linkedMapOf<String, MegaEvent>()
+        var cursor = 0L
+        repeat(100) {
+            val page = withTimeout(SDK_TIMEOUT_MS) {
+                suspendCancellableCoroutine<List<MegaEvent>> { continuation ->
+                    val operation = MegaEventManager.query(condition, refresh = cursor == 0L, lastEventTime = cursor,
+                        onSuccess = { if (continuation.isActive) continuation.resume(it) },
+                        onFailure = { _, _ -> if (continuation.isActive) continuation.resumeWithException(
+                            IllegalStateException("设备历史事件读取失败，请检查权限与网络后重试")) })
+                    continuation.invokeOnCancellation { operation.cancel() }
+                }
+            }
+            check(epoch == diaryEpoch && initialized) { "设备账号已切换，请重新读取" }
+            if (page.isEmpty()) return all.values.sortedBy { it.startTimestamp }
+            val before = all.size
+            page.filter { it.deviceSn == deviceSn && it.startTimestamp >= start && it.startTimestamp < end }
+                .forEach { all[it.megaEventId] = it }
+            val next = page.minOf { it.startTimestamp }
+            if (page.size < 100) return all.values.sortedBy { it.startTimestamp }
+            check(next > 0 && (cursor == 0L || next < cursor) && all.size > before) {
+                "设备历史分页未前进，未标记同步完成，请重试"
+            }
+            cursor = next
+        }
+        error("设备历史事件过多，未标记同步完成")
+    }
+
+    private suspend fun resolveDiaryEvent(deviceSn: String, providerEventId: String, capturedAt: Instant): MegaEvent {
+        val start = capturedAt.toEpochMilli() - 1000
+        return queryDiaryEvents(deviceSn, start, start + 2001).firstOrNull { it.megaEventId == providerEventId }
+            ?: error("未找到该历史事件，可能已过期或当前设备账号无权访问")
+    }
+
+    suspend fun loadDiaryImage(deviceSn: String, providerEventId: String, capturedAt: Instant, mediaKey: String): String {
+        val event = resolveDiaryEvent(deviceSn, providerEventId, capturedAt)
+        val picture = if (mediaKey == "thumbnail") event.thumbnail else event.pictures.firstOrNull {
+            val key = MessageDigest.getInstance("SHA-256").digest(it.picturePath.toByteArray())
+                .joinToString("") { b -> "%02x".format(b) }.take(32)
+            mediaKey == "picture_$key"
+        }
+        check(picture != null && picture.picturePath.isNotBlank()) { "该事件没有可读取的图片" }
+        return withTimeout(SDK_TIMEOUT_MS) {
+            suspendCancellableCoroutine { continuation ->
+                MegaEventManager.getEventImageBase64(picture.picturePath, picture.parentSn,
+                    onSuccess = { value -> if (continuation.isActive) {
+                        if (value.isNullOrBlank()) continuation.resumeWithException(IllegalStateException("图片暂不可用，请重试"))
+                        else continuation.resume(value)
+                    } },
+                    onFailure = { _, _ -> if (continuation.isActive) continuation.resumeWithException(
+                        IllegalStateException("图片读取失败，请检查设备权限与网络后重试")) })
+            }
+        }
+    }
+
+    suspend fun createDiaryPlayer(deviceSn: String, providerEventId: String, capturedAt: Instant): EventMediaPlayer {
+        val event = resolveDiaryEvent(deviceSn, providerEventId, capturedAt)
+        check(event.videoPath.isNotBlank()) { "该历史事件没有录像" }
+        val device = MegaDeviceManager.getDeviceBy(deviceSn) ?: error("当前设备账号无权访问该设备")
+        return EventMediaPlayer(event, device)
+    }
     private val appContext = context.applicationContext
     private val events = ConcurrentHashMap<String, MegaEvent>()
     @Volatile private var initialized = false
@@ -250,6 +341,7 @@ class RealEufySdkGateway(context: Context) : EufySdkGateway {
     }
 
     override fun logout() {
+        diaryEpoch++
         events.clear()
         if (initialized) ESIotKit.logout()
         initialized = false

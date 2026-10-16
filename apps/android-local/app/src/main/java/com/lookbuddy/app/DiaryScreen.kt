@@ -62,10 +62,10 @@ internal val DiaryExampleEntries = listOf(
 )
 
 @Composable
-internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}) {
+internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}, initialDate: LocalDate? = null) {
     val product = LocalProduct.current
     val today = rememberAppTime().toLocalDate()
-    var dateText by rememberSaveable { mutableStateOf<String?>(null) }
+    var dateText by rememberSaveable(initialDate?.toString()) { mutableStateOf(initialDate?.toString()) }
     var example by rememberSaveable { mutableStateOf(false) }
     val date = dateText?.let { LocalDate.parse(it) } ?: today
     val showExample = example
@@ -77,22 +77,27 @@ internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}) {
     var page by remember(date, accountId) { mutableStateOf<JSONObject?>(null) }
     var loadError by remember(date, accountId) { mutableStateOf<String?>(null) }
     var loading by remember(date, accountId) { mutableStateOf(false) }
+    var mediaSyncing by remember(date, accountId) { mutableStateOf(false) }
+    var mediaSyncError by remember(date, accountId) { mutableStateOf<String?>(null) }
+    val identity = product?.diaryIdentity
     var actionError by remember(date, accountId) { mutableStateOf<String?>(null) }
+    var actionSuccess by remember(date, accountId) { mutableStateOf<String?>(null) }
     var editing by remember(date, accountId) { mutableStateOf(false) }
     var edited by remember(date, accountId) { mutableStateOf("") }
     var confirmDelete by remember(date, accountId) { mutableStateOf(false) }
     suspend fun reload(): Boolean {
         loading = true
         return try {
-            page = JSONObject(product!!.request("/v1/diary-page/$date")); loadError = null; true
+            page = JSONObject(product!!.request("/v1/diary-page/$date", expectedIdentity = identity)); loadError = null; true
         } catch (e: CancellationException) { throw e }
         catch (_: Exception) { loadError = "日记读取失败，请重试"; false }
         finally { loading = false }
     }
     suspend fun write(method: String, path: String, body: JSONObject? = null): Boolean {
         actionError = null
+        actionSuccess = null
         return try {
-            product!!.request(path, method, body)
+            product!!.request(path, method, body, expectedIdentity = identity)
             if (reload()) true else {
                 actionError = "操作已提交，读取最新日记失败，请刷新核对"; false
             }
@@ -100,6 +105,17 @@ internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}) {
         catch (_: Exception) { actionError = "日记操作失败，请重试"; false }
     }
     LaunchedEffect(date, accountId, showExample) { if (product != null && !showExample) reload() }
+    suspend fun syncDeviceMedia() {
+        if (product == null || identity == null || mediaSyncing) return
+        mediaSyncing = true; mediaSyncError = null
+        try { product.diaryMedia.sync(date, identity); reload() }
+        catch (e: CancellationException) { throw e }
+        catch (e: Exception) { mediaSyncError = e.message ?: "设备记录同步失败，请重试" }
+        finally { mediaSyncing = false }
+    }
+    LaunchedEffect(date, identity, showExample) {
+        if (!showExample && product?.gateway?.diaryConnected == true) syncDeviceMedia()
+    }
     LaunchedEffect(date) { scroll.scrollTo(0) }
     val content = page?.takeUnless { it.isNull("content") }?.optString("content").orEmpty()
     val entries = page?.optJSONArray("entries")
@@ -158,7 +174,9 @@ internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}) {
             Column {
                 Row(Modifier.fillMaxWidth()) {
                     TextButton(enabled = !busy, modifier = Modifier.weight(1f).testTag("diary_generate"),
-                        onClick = { product.action { write("POST", "/v1/diaries/$date/generate", JSONObject()) } }) { Text("生成日记") }
+                        onClick = { product.action {
+                            if (write("POST", "/v1/diaries/$date/generate", JSONObject())) actionSuccess = "$date 的日记已更新"
+                        } }) { Text("生成日记") }
                     TextButton(enabled = !busy, modifier = Modifier.weight(1f).testTag("diary_refresh"),
                         onClick = { scope.launch { reload() } }) { Text("刷新") }
                 }
@@ -169,7 +187,13 @@ internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}) {
                         onClick = { actionError = null; confirmDelete = true }) { Text("删除正文") }
                 }
             }
+            actionSuccess?.let { Text(it, color = CompanionClay, modifier = Modifier.testTag("diary_success")) }
             if (busy) Text("日记同步中…", color = CompanionMuted, modifier = Modifier.testTag("diary_loading"))
+            Text("图片与录像在你主动查看时从设备读取，后端只保存引用。可用期限由设备服务决定。", color = CompanionMuted, fontSize = 11.sp)
+            TextButton(enabled = !mediaSyncing && !busy, onClick = { scope.launch { syncDeviceMedia() } }) {
+                Text(if (mediaSyncing) "正在同步设备记录…" else "同步当天设备记录")
+            }
+            mediaSyncError?.let { Text(it, color = CompanionClay, modifier = Modifier.testTag("diary_media_sync_error")) }
             loadError?.let { Text(it, color = CompanionClay, modifier = Modifier.testTag("diary_load_error")) }
             actionError?.let { Text(it, color = CompanionClay, modifier = Modifier.testTag("diary_action_error")) }
             if (loadError != null && page != null) Text("以下保留上次读取的内容", color = CompanionMuted, fontSize = 11.sp)
@@ -177,7 +201,9 @@ internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}) {
                 modifier = Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(16.dp)).padding(16.dp)
                     .testTag("diary_body"))
             if (entries != null) for (i in 0 until entries.length()) {
-                DiaryRecordedEntry(entries.getJSONObject(i), i, s)
+                key(date, identity, entries.getJSONObject(i).optString("id", "entry_$i")) {
+                    DiaryRecordedEntry(entries.getJSONObject(i), i, s, entries)
+                }
             }
         }
         if (showExample) {
@@ -257,7 +283,7 @@ private fun BuddyDiaryCarousel(s: Float, example: Boolean, onChat: () -> Unit) {
 
 /** Recorded events share the timeline style without borrowing example keyframes or video. */
 @Composable
-private fun DiaryRecordedEntry(entry: JSONObject, index: Int, s: Float) {
+private fun DiaryRecordedEntry(entry: JSONObject, index: Int, s: Float, candidates: org.json.JSONArray? = null) {
     Row(Modifier.fillMaxWidth().heightIn(min = 106.dp * s).testTag("diary_record_$index"),
         horizontalArrangement = Arrangement.spacedBy(10.dp * s)) {
         Text(entry.optString("time"), color = CompanionMuted, fontSize = (11 * s).sp,
@@ -271,6 +297,7 @@ private fun DiaryRecordedEntry(entry: JSONObject, index: Int, s: Float) {
                 Text(it, color = CompanionMuted, fontSize = (10 * s).sp)
             }
             Text(entry.optString("category"), color = CompanionClay, fontSize = (9 * s).sp)
+            DiaryEntryMedia(entry, candidates)
         }
     }
 }

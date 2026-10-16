@@ -78,10 +78,11 @@ def test_concurrent_display_acknowledgements_do_not_break_budget(client, auth):
         keys = [first.id, second.id]
         db.commit()
     with ThreadPoolExecutor(max_workers=2) as pool:
-        responses = list(pool.map(lambda key: client.post(f'/v1/interventions/{key}/displayed', headers=auth), keys))
+        responses = list(pool.map(lambda key: client.post(f'/v1/interventions/{key}/displayed', headers=auth,
+                                                         json={"claimId": "web:same-client"}), keys))
     assert sorted(response.status_code for response in responses) == [200, 409]
     accepted = keys[next(index for index, response in enumerate(responses) if response.status_code == 200)]
-    assert client.post(f'/v1/interventions/{accepted}/displayed', headers=auth).status_code == 200
+    assert client.post(f'/v1/interventions/{accepted}/displayed', headers=auth, json={"claimId": "web:same-client"}).status_code == 200
     with Session(engine) as db:
         assert len(list(db.scalars(select(Intervention).where(Intervention.displayed_at.is_not(None))))) == 1
 

@@ -10,6 +10,7 @@ from sqlalchemy import text
 from .api import router
 from .product import router as product_router, compatibility as product_compatibility
 from .accounts import router as account_router
+from .diary_media import router as diary_media_router
 from .config import get_settings
 from .database import check_storage_access, engine
 from .migrations import migrate
@@ -45,6 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(product_router)
+app.include_router(diary_media_router)
 app.include_router(account_router)
 app.include_router(product_compatibility)
 app.include_router(router)

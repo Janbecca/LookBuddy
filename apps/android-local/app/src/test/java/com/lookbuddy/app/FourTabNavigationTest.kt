@@ -97,4 +97,24 @@ class FourTabNavigationTest {
         compose.onNodeWithTag("morning_home").assertExists()
         compose.onNodeWithTag("nav_home").assertIsSelected()
     }
+
+    @Test fun remoteResponseFailureKeepsCardAndSameChoiceCanRetry() {
+        val events = MutableStateFlow(HomeReminderEvent("server:posture", HomeReminderKind.Posture, remote = true))
+        var attempts = 0
+        val source = object : HomeReminderSource {
+            override val reminders = events
+            override suspend fun respond(id: String, response: HomeReminderResponse) {
+                assertEquals("server:posture", id)
+                assertEquals(HomeReminderResponse.Accepted, response)
+                attempts++
+                if (attempts == 1) throw ProductHttpException(503)
+            }
+        }
+        compose.setContent { LookBuddyApp(reminderSource = source) }
+        compose.onNodeWithTag("reminder_accepted").performClick()
+        compose.onNodeWithTag("reminder_response_error").assertExists()
+        compose.onNodeWithTag("reminder_accepted").performClick()
+        compose.onNodeWithTag("home_reminder_bubble").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(2, attempts) }
+    }
 }

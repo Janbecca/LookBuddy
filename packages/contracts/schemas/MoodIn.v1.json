@@ -6,7 +6,10 @@
         "Happy",
         "Calm",
         "Tired",
-        "Sad"
+        "Sad",
+        "Curious",
+        "Thoughtful",
+        "Excited"
       ],
       "title": "Mood",
       "type": "string"
