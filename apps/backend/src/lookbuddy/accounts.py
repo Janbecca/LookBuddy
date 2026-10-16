@@ -66,7 +66,7 @@ router = APIRouter(prefix="/v1")
 @router.post("/auth/username", response_model=TokenPair)
 def username_login(body: UsernameLogin, db: Session = Depends(get_db)):
     settings = get_settings()
-    if not settings.demo_login_enabled or settings.env not in {"development", "competition"}:
+    if not settings.demo_login_enabled:
         raise HTTPException(403, "Username-only demonstration login is disabled")
     lock_user(db, "username-create")
     if db.get_bind().dialect.name == "postgresql":

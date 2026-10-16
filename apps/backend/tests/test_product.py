@@ -17,13 +17,14 @@ def login(client, monkeypatch, phone="13800000000", installation=None):
     return {"Authorization": "Bearer " + value.json()["accessToken"]}, value.json()
 
 
-def test_demo_disabled_and_never_production(client, monkeypatch):
+@pytest.mark.parametrize("env", ["development", "competition", "production"])
+def test_demo_phone_login_controlled_by_demo_flag(client, monkeypatch, env):
+    monkeypatch.setattr(get_settings(), "env", env)
     monkeypatch.setattr(get_settings(), "demo_login_enabled", False)
     body = {"phone": "13800000000", "installationId": str(uuid4())}
     assert client.post("/v1/auth/demo-phone", json=body).status_code == 403
     monkeypatch.setattr(get_settings(), "demo_login_enabled", True)
-    monkeypatch.setattr(get_settings(), "env", "production")
-    assert client.post("/v1/auth/demo-phone", json=body).status_code == 403
+    assert client.post("/v1/auth/demo-phone", json=body).status_code == 200
 
 
 @pytest.mark.parametrize("phone,code", [("", ""), ("abc", "wrong"), ("随便填写！", "随便验证码"), ("123", "000000"), ("   ", "!@#$")])
@@ -36,7 +37,9 @@ def test_demo_accepts_arbitrary_inputs(client, monkeypatch, phone, code):
     assert again.status_code == 200
     assert again.json()["user"]["id"] == first.json()["user"]["id"]
     monkeypatch.setattr(get_settings(), "env", "production")
-    assert client.post("/v1/auth/demo-phone", json=body).status_code == 403
+    production = client.post("/v1/auth/demo-phone", json=body)
+    assert production.status_code == 200, production.text
+    assert production.json()["user"]["id"] == first.json()["user"]["id"]
 
 
 def test_demo_allows_omitting_phone_and_code(client, monkeypatch):

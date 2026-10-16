@@ -80,12 +80,13 @@ def test_concurrent_first_login_creates_exactly_one_account(client, monkeypatch)
         assert len(db.scalars(select(AccountName).where(AccountName.name == "race")).all()) == 1
 
 
-def test_disabled_and_production_fail_closed(client, monkeypatch):
+@pytest.mark.parametrize("env", ["development", "competition", "production"])
+def test_username_login_controlled_by_demo_flag(client, monkeypatch, env):
+    monkeypatch.setattr(get_settings(), "env", env)
     monkeypatch.setattr(get_settings(), "demo_login_enabled", False)
     assert client.post("/v1/auth/username", json={"username": "one"}).status_code == 403
     monkeypatch.setattr(get_settings(), "demo_login_enabled", True)
-    monkeypatch.setattr(get_settings(), "env", "production")
-    assert client.post("/v1/auth/username", json={"username": "one"}).status_code == 403
+    assert client.post("/v1/auth/username", json={"username": "one"}).status_code == 200
 
 
 @pytest.mark.parametrize("username", ["", "   ", "a\nb", "x" * 321])

@@ -119,7 +119,7 @@ compatibility = APIRouter()
 @router.post("/auth/demo-phone", response_model=TokenPair)
 def demo_phone(body: DemoPhoneIn, db: Session = Depends(get_db)):
     settings = get_settings()
-    if not settings.demo_login_enabled or settings.env not in {"development", "competition"}:
+    if not settings.demo_login_enabled:
         raise HTTPException(403, "Demo phone login is disabled; it never verifies a phone")
     # Same phone on a different install MUST NOT expose another install's data.
     phone = body.phone.strip().removeprefix("+86")
