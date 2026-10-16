@@ -143,8 +143,18 @@ internal fun MorningHomeContent(
         // Overlay scene is independent from header/drawer; shrink uniformly only when height is constrained.
         val drawerTop = maxHeight.value - navHeight.value - bottomInset.value - 183f * s
         val sceneScale = minOf(s, ((drawerTop - 184f * s) / 330f).coerceAtLeast(.35f))
+        val quoteHasRoom = reminders.active == null || (density.fontScale <= 1.1f && maxHeight.value >= 760f * s)
+        val sceneOrigin = 184f * (s - sceneScale)
+        val artworkBottom = when {
+            reminders.active?.kind?.usesDefaultArtwork == false -> 453f
+            night -> 545f
+            else -> 488.01f
+        }
+        // Move the entire IP/bubble group together; preserve an explicit gap above the quote or drawer.
+        val lowerLimit = drawerTop - if (quoteHasRoom) (48f * s + 16f * sceneScale) else 16f * s
+        val sceneDrop = minOf(32f * s, (lowerLimit - sceneOrigin - artworkBottom * sceneScale).coerceAtLeast(0f))
         Box(Modifier.fillMaxSize().offset(x = ((maxWidth.value - 393f * sceneScale) / 2f).dp,
-            y = (184f * (s - sceneScale)).dp)) {
+            y = (sceneOrigin + sceneDrop).dp).testTag("home_ip_bubble_group")) {
             HomeBuddyArtwork(reminders, workPlayback, night, sceneScale, sceneScale)
             HomeReminderBubble(reminders, drawerProgress > .001f, sceneScale, sceneScale, onReminderAcknowledged, onReminderChat, onDiary)
         }
@@ -189,17 +199,18 @@ internal fun MorningHomeContent(
         // Keep the user's existing optional desktop bridge; its greeting never adds a second home bubble.
         if (greetingScene != null) {
             val greeting by rememberBuddyGreeting(scene = greetingScene).collectAsState()
-            DesktopPetSyncEffect(scene = greetingScene, working = working,
-                message = greeting.message.takeIf { greeting.show && it.isNotBlank() })
+            val desktopEvent = reminders.active
+            DesktopPetSyncEffect(scene = desktopEvent?.kind?.backendKey ?: if (greeting.show) greetingScene else if (night) "evening" else "idle", working = working,
+                message = desktopEvent?.message ?: greeting.message.takeIf { greeting.show && it.isNotBlank() },
+                eventId = desktopEvent?.id, defaultScene = if (night) "evening" else "idle")
         }
 
-        val quoteHasRoom = reminders.active == null || (density.fontScale <= 1.1f && maxHeight.value >= 760f * s)
         if (drawerProgress < 1f && quoteHasRoom) {
             Text("一起陪伴的第${companionDays}天，也要照顾好自己~", color = HomeInk, fontSize = (16 * s).sp,
                 letterSpacing = (2.2f * s).sp, lineHeight = (30 * s).sp, textAlign = TextAlign.Center,
                 modifier = Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = 1f - drawerProgress }
                     .padding(bottom = navHeight + bottomInset + drawerHeight + 18.dp * s)
-                    .fillMaxWidth().padding(horizontal = 20.dp * s))
+                    .fillMaxWidth().padding(horizontal = 20.dp * s).testTag("home_companion_quote"))
         }
         StatisticsDrawer(expanded, drawerMotion, s, Modifier.align(Alignment.BottomCenter)
             .padding(bottom = navHeight + bottomInset).height(drawerHeight), now.toLocalDate()) { expanded = it }

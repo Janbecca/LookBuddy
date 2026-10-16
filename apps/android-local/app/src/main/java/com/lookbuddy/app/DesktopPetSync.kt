@@ -22,7 +22,9 @@ internal data class DesktopPetSyncRequest(
     val scene: String,
     val working: Boolean,
     val mood: String = "calm",
-    val message: String? = null
+    val message: String? = null,
+    val eventId: String? = null,
+    val defaultScene: String = "idle"
 )
 
 internal data class DesktopPetSnapshot(
@@ -50,6 +52,8 @@ internal class DesktopPetSyncRepository(
                 val body = JSONObject().apply {
                     put("client_id", "android")
                     put("scene", request.scene)
+                    put("default_scene", request.defaultScene)
+                    request.eventId?.let { put("event_id", it) }
                     put("working", request.working)
                     put("mood", request.mood)
                     request.message?.takeIf { it.isNotBlank() }?.let { put("message", it) }
@@ -86,16 +90,18 @@ internal class DesktopPetSyncRepository(
 internal fun DesktopPetSyncEffect(
     scene: String,
     working: Boolean,
-    message: String?
+    message: String?,
+    eventId: String? = null,
+    defaultScene: String = "idle"
 ) {
     val inspection = LocalInspectionMode.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val repository = remember { DesktopPetSyncRepository() }
-    LaunchedEffect(scene, working, message, inspection) {
+    LaunchedEffect(scene, working, message, eventId, defaultScene, inspection) {
         if (inspection || BuildConfig.LOOKBUDDY_DESKTOP_URL.isBlank()) return@LaunchedEffect
         while (currentCoroutineContext().isActive) {
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                repository.sync(DesktopPetSyncRequest(scene, working, message = message))
+                repository.sync(DesktopPetSyncRequest(scene, working, message = message, eventId = eventId, defaultScene = defaultScene))
             }
             delay(15_000)
         }

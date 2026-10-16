@@ -230,10 +230,8 @@ internal fun HomeReminderBubble(
             .clip(RoundedCornerShape(70.dp * s)).background(Color.White.copy(alpha = .48f))
             .testTag("home_reminder_bubble").padding(15.dp * s),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp * s)) {
-            Text(display.title, color = CompanionInk, fontSize = (18.75f * s).sp, lineHeight = (27.5f * s).sp,
-                textAlign = TextAlign.Center, modifier = Modifier.width(120.dp * s))
             Text(display.message, color = CompanionMuted, fontSize = (15f * s).sp, lineHeight = (22.5f * s).sp,
-                textAlign = TextAlign.Center, modifier = Modifier.width(120.dp * s))
+                textAlign = TextAlign.Center, modifier = Modifier.width(120.dp * s).testTag("reminder_message"))
             if (display.kind.buttonLabel != null) Box(Modifier.width(104.dp * s).heightIn(min = maxOf(44.dp, 44.dp * s))
                 .clip(RoundedCornerShape(22.dp * s)).background(Color.White.copy(alpha = .48f))
                 .clickable(enabled = event?.id == display.id && !hidden, role = Role.Button) {

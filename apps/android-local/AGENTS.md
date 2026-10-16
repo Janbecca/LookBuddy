@@ -25,3 +25,7 @@
 - 2026-10-16 App 1.6.0 聊一聊前端：按Figma 299:3996新增暖色背景聊天页，日记页354:4094气泡及首页入口可进入，疲劳/开心/关心提醒按钮进入聊天，其他三类为“好的”并关闭。复用现有三Tab；返回恢复来源页面，草稿与未发送内容支持Activity状态恢复。聊天API未接入，用户内容明确标记暂未发送，不模拟Buddy回复。原始Figma素材本地打包；仅前端改动，同步apps/android-local约定分支，不更新main或apps/backend。本次提交号和验证结果见工作区output/lookbuddy-chat-ui/sync-result.json。具体范围见CHAT_UI.md。
 
 - 2026-10-16 App 1.6.1 首页动画纠正：按用户给定路径接入饮水/伸展/坐姿/趴桌犯困/开心/安慰倾听/早间七个原始WebP，文件Git blob SHA逐一登记于HOME_REMINDER_ASSETS.json。删除首页顶部单独聊一聊入口，首页仅疲劳/开心/关心气泡进入聊天，日记页入口保留。默认态尺寸及播放逻辑不改；其他动画按现有饮水有效高度192.71484dp统一等比缩放，宽场景保持屏内，坐姿素材的黑色边带仅在渲染时裁开，原始文件不改。早晚问候无按钮，工位日记去看看跳到日记；后端触发接收仍待接入。本次同步记录见工作区output/lookbuddy-animation-fix/sync-result.json。
+
+- 2026-10-16 桌宠0.2场景统一：正式工程为桌面宠物/LookBuddy_Desktop；饮水/久坐/坐姿/疲劳/开心/关心/早间七种动作复用App首页原始WebP，manifest登记Git blob SHA。晚间保留看电视吃薯片，diary_ready保持当前日夜默认态，新增接收约定但后端自动生产尚未接入。Android首页局域网桥接转发当前提醒种类、事件ID和默认场景；提醒结束恢复默认，同ID不重播，新ID重播，播完保持末帧。22项桌宠单元/HTTP测试、7种真实Electron场景截图及末帧/去重测试通过；Android52项测试与调试包构建通过。原有完整窗口回归在本机出现464×460尺寸差异与置顶恢复失败，未声称完整桌宠回归通过。未安装手机App。具体同步提交及核对范围见工作区output/desktop-scene-sync/sync-result.json；不更新main/apps/android/apps/desktop/apps/backend，保留旧desktop及根README差异。实际D盘工程仍无.git；本次使用工作区隔离Git仓库读取最新分支并尝试普通提交推送，不代表后台同步。
+
+- 2026-10-16 App 1.6.2：首页IP和气泡整体适度下移，最大32dp并按陪伴标语/统计面板剩余空间限制位移，默认态大小不变；所有首页提醒/问候/日记提醒气泡删除主标题，仅保留15sp、CompanionMuted色的提示正文及原按钮。同步记录见工作区output/lookbuddy-home-spacing/sync-result.json。
