@@ -1,0 +1,6 @@
+# LookBuddy 关心语后端仅使用 Python 标准库，无需安装第三方包。
+# Python 3.8+ 即可运行。
+#
+# 可选: 如需自动加载 .env 文件的高级功能，可安装 python-dotenv，
+# 但 app.py 已内置简易 .env 解析，无需此依赖。
+# python-dotenv==1.0.0

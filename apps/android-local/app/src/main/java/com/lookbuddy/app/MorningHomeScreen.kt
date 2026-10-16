@@ -1,0 +1,479 @@
+package com.lookbuddy.app
+
+import android.content.res.AssetManager
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.sp
+import com.caverock.androidsvg.SVG
+import com.caverock.androidsvg.RenderOptions
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+
+private val HomeInk = Color(0xFF38291F)
+private val HomeMuted = Color(0xFF756354)
+private val HomeCard = Color(0xFFFBF7F1)
+internal val LocalHomeSvgLoader = staticCompositionLocalOf<(AssetManager, String) -> SVG> {
+    { assets, filename -> SVG.getFromAsset(assets, filename) }
+}
+
+/** Follow the finger without launching a new animation for every drag delta. */
+@Stable
+private class StatisticsDrawerMotion(initialExpanded: Boolean, private val scope: CoroutineScope) {
+    var progress by mutableFloatStateOf(if (initialExpanded) 1f else 0f)
+        private set
+    private var settling: Job? = null
+
+    fun stop() { settling?.cancel(); settling = null }
+
+    fun dragBy(deltaY: Float, range: Float): Float {
+        stop()
+        val previous = progress
+        progress = (progress - deltaY / range).coerceIn(0f, 1f)
+        return (previous - progress) * range
+    }
+
+    fun settle(velocityY: Float, range: Float, onTarget: (Boolean) -> Unit) {
+        val open = if (abs(velocityY) > range * 1.5f) velocityY < 0 else progress >= .5f
+        settleTo(open, onTarget)
+    }
+
+    fun settleTo(open: Boolean, onTarget: (Boolean) -> Unit) {
+        stop()
+        onTarget(open)
+        settling = scope.launch {
+            animate(progress, if (open) 1f else 0f,
+                animationSpec = spring(dampingRatio = 1f, stiffness = 400f)) { value, _ ->
+                progress = value.coerceIn(0f, 1f)
+            }
+        }
+    }
+}
+
+/** The morning Figma screen and its statistics drawer share the same original assets. */
+@Composable
+internal fun MorningHomeContent(
+    initialExpanded: Boolean = false,
+    onCalendar: () -> Unit = {},
+    greetingScene: String? = "morning_seated",
+    onCamera: () -> Unit = {},
+    onDiary: () -> Unit = {},
+    onSettings: () -> Unit = {}
+) {
+    var expanded by rememberSaveable { mutableStateOf(initialExpanded) }
+    var working by rememberSaveable { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+    val drawerMotion = remember { StatisticsDrawerMotion(expanded, scope) }
+    BoxWithConstraints(Modifier.fillMaxSize().clipToBounds().testTag("morning_home")) {
+        val s = maxWidth.value / 393f
+        val density = LocalDensity.current
+        val topInset = with(density) { WindowInsets.statusBars.getTop(this).toDp().value }
+        val bottomInset = maxOf(with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }, 34.dp * s)
+        val navHeight = 56.dp * s
+        val drawerProgress = drawerMotion.progress
+        val drawerHeight = (183f + 255f * drawerProgress).dp * s
+
+        Image(painterResource(R.drawable.home_room), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        if (drawerProgress < 1f) {
+            FigmaSvg("top_curve", s, Modifier.offset(x = (310.55f * s).dp, y = (-417.4f * s).dp)
+                .graphicsLayer { alpha = 1f - drawerProgress })
+        }
+        Column(Modifier.fillMaxWidth().statusBarsPadding()) {
+            Spacer(Modifier.height((62f * s - topInset).coerceAtLeast(0f).dp))
+            Row(Modifier.fillMaxWidth().height(51.dp * s).padding(horizontal = 16.dp * s),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text("LOOKBuddy", color = Color.Black, fontSize = (24 * s).sp, modifier = Modifier.weight(1f))
+                Row(Modifier.offset(y = 8.dp * s), horizontalArrangement = Arrangement.spacedBy(8.dp * s)) {
+                    HeaderIcon("calendar_circle", "calendar", s, "心情日历", onCalendar)
+                    HeaderIcon("camera_circle", "camera", s, "陪伴视角", onCamera)
+                }
+            }
+            Row(Modifier.align(Alignment.CenterHorizontally).width(200.dp * s).height(38.dp * s)
+                .clip(RoundedCornerShape(66.dp)).background(Color.White.copy(alpha = 0.1f))) {
+                listOf(true, false).forEach { isWork ->
+                    Row(Modifier.weight(1f).fillMaxHeight()
+                        .background(if (working == isWork) BuddyCream.copy(alpha = 0.6f) else Color.Transparent,
+                            RoundedCornerShape(28.dp))
+                        .clickable(role = Role.Button) { working = isWork }.testTag(if (isWork) "work_mode" else "offwork_mode"),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                        FigmaSvg(if (isWork) "work" else "offwork", s)
+                        Spacer(Modifier.width(6.dp * s))
+                        Text(if (isWork) "上班中" else "下班喽~", color = HomeInk, fontSize = (14 * s).sp)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth().height(32.dp * s).padding(horizontal = 11.dp * s),
+                verticalAlignment = Alignment.CenterVertically) {
+                WorkTime("已上班", "8：00", s)
+                Box(Modifier.weight(1f).padding(horizontal = 5.dp * s).height(13.dp * s)
+                    .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(8.dp)))
+                WorkTime("距下班时间", "8：00", s)
+            }
+            Spacer(Modifier.height(19.dp * s))
+            Box(Modifier.fillMaxWidth().height(277.dp * s).clipToBounds()) {
+                Image(painterResource(R.drawable.home_buddy_desk), "LookBuddy 在桌前陪你工作",
+                    Modifier.align(Alignment.TopCenter).offset(x = (-6).dp * s)
+                        .requiredSize(353.dp * s, 290.dp * s), contentScale = ContentScale.Crop)
+                // GLM 关心语气泡：在 Buddy IP 旁展示，不阻塞首页加载。
+                // greetingScene 为 null 时跳过（测试 / 预览模式），避免发网络请求。
+                if (greetingScene != null) {
+                    val greeting = rememberBuddyGreeting(scene = greetingScene)
+                    val g by greeting.collectAsState()
+                    if (g.show && g.message.isNotBlank()) {
+                        BuddySpeechBubble(
+                            message = g.message,
+                            s = s,
+                            modifier = Modifier.align(Alignment.TopStart)
+                                .offset(x = 22.dp * s, y = 10.dp * s)
+                                .testTag("buddy_greeting_bubble")
+                                .semantics { contentDescription = "Buddy 关心语" }
+                        )
+                    }
+                }
+            }
+        }
+        if (drawerProgress < 1f) {
+            Text("一起工作的第100天也要加油呀~", color = HomeInk, fontSize = (16 * s).sp,
+                letterSpacing = (2.2f * s).sp, lineHeight = (30 * s).sp, textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = 1f - drawerProgress }
+                    .padding(bottom = navHeight + bottomInset + drawerHeight + 18.dp * s)
+                    .fillMaxWidth().padding(horizontal = 20.dp * s))
+        }
+        StatisticsDrawer(expanded, drawerMotion, s, Modifier.align(Alignment.BottomCenter)
+            .padding(bottom = navHeight + bottomInset).height(drawerHeight)) { expanded = it }
+        Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.White)
+            .padding(bottom = bottomInset).height(navHeight).padding(horizontal = 28.dp * s),
+            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(42.dp * s).clickable(role = Role.Button) { }
+                .testTag("nav_home"), contentAlignment = Alignment.Center) { FigmaSvg("nav_home", s) }
+            Box(Modifier.size(48.dp * s).clickable(role = Role.Tab, onClick = onDiary)
+                .semantics { contentDescription = "陪伴日记" }
+                .testTag("nav_diary"), contentAlignment = Alignment.Center) { FigmaSvg("nav_statistics", s) }
+            Box(Modifier.size(48.dp * s).clickable(role = Role.Tab, onClick = onSettings)
+                .semantics { contentDescription = "个人设置" }
+                .testTag("nav_settings"), contentAlignment = Alignment.Center) { FigmaSvg("nav_memories", s) }
+        }
+    }
+}
+
+@Composable
+private fun HeaderIcon(circle: String, icon: String, s: Float, description: String, onClick: (() -> Unit)? = null) {
+    Box(Modifier.size(37.dp * s, 36.dp * s)
+        .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+        .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center) {
+        FigmaSvg(circle, s)
+        FigmaSvg(icon, s)
+    }
+}
+
+@Composable
+private fun WorkTime(label: String, value: String, s: Float) {
+    Column(Modifier.width(53.dp * s), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = HomeInk, fontSize = (8 * s).sp, lineHeight = (11 * s).sp)
+        Text(value, color = HomeInk, fontSize = (12 * s).sp, lineHeight = (17 * s).sp)
+    }
+}
+
+@Composable
+private fun StatisticsDrawer(
+    expanded: Boolean,
+    motion: StatisticsDrawerMotion,
+    s: Float,
+    modifier: Modifier,
+    onExpand: (Boolean) -> Unit
+) {
+    val shape = RoundedCornerShape(topStart = 20.dp * s, topEnd = 20.dp * s)
+    val latestExpand by rememberUpdatedState(onExpand)
+    val range = with(LocalDensity.current) { (255.dp * s).toPx() }
+    val scroll = rememberScrollState()
+    val showDetails = expanded || motion.progress > .001f
+    val gesture = remember(motion, range, scroll) {
+        object : NestedScrollConnection {
+            var draggingSheet = false
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
+                // Open before scrolling content; close only once content is back at its top.
+                if ((available.y < 0 && motion.progress < 1f) ||
+                    (available.y > 0 && scroll.value == 0 && motion.progress > 0f)) {
+                    val consumed = motion.dragBy(available.y, range)
+                    draggingSheet = draggingSheet || consumed != 0f
+                    return Offset(0f, consumed)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y > 0 && scroll.value == 0 && motion.progress > 0f) {
+                    val moved = motion.dragBy(available.y, range)
+                    draggingSheet = draggingSheet || moved != 0f
+                    return Offset(0f, moved)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (!draggingSheet) return Velocity.Zero
+                draggingSheet = false
+                motion.settle(available.y, range, latestExpand)
+                return Velocity(0f, available.y)
+            }
+        }
+    }
+    Box(modifier.fillMaxWidth().testTag("statistics_sheet")) {
+    // Only the outer edge casts a shadow; the transparent tray keeps the room visible beneath it.
+    Box(Modifier.matchParentSize().drawWithContent {
+        val outline = shape.createOutline(size, layoutDirection, this)
+        val path = Path().apply {
+            when (outline) {
+                is Outline.Rounded -> addRoundRect(outline.roundRect)
+                is Outline.Rectangle -> addRect(outline.rect)
+                is Outline.Generic -> addPath(outline.path)
+            }
+        }
+        clipPath(path, ClipOp.Difference) { this@drawWithContent.drawContent() }
+    }.dropShadow(shape, Shadow(radius = 4.dp * s, color = Color.Black.copy(alpha = 0.25f),
+        offset = DpOffset(4.dp * s, 0.dp))))
+    Column(Modifier.fillMaxSize().clip(shape)
+        .background(Color.White.copy(alpha = .5f + .25f * motion.progress))
+        .testTag(if (showDetails) "expanded_stats" else "collapsed_stats")
+        .nestedScroll(gesture).padding(horizontal = 20.dp * s)) {
+        Column(Modifier.fillMaxWidth().height((22f + 44f * motion.progress).dp * s)
+            .draggable(state = rememberDraggableState { motion.dragBy(it, range) },
+                orientation = Orientation.Vertical,
+                onDragStarted = { motion.stop() },
+                onDragStopped = { motion.settle(it, range, latestExpand) })
+            .then(if (!showDetails) Modifier.clickable(
+                interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Button
+            ) { motion.settleTo(true, latestExpand) } else Modifier)
+            .semantics { contentDescription = if (showDetails) "下滑收起统计便当" else "展开统计便当" }
+            .testTag("stats_toggle"), horizontalAlignment = Alignment.CenterHorizontally) {
+            Spacer(Modifier.height((8f + motion.progress).dp * s))
+            Box(Modifier.size(35.dp * s, 3.dp * s).background(Color(0xFFDED6CC), RoundedCornerShape(2.dp)))
+            if (showDetails) {
+                Spacer(Modifier.height(14.dp * s))
+                Row(Modifier.fillMaxWidth().height(28.dp * s), verticalAlignment = Alignment.CenterVertically) {
+                    Text("今日陪伴", color = HomeInk, fontSize = (20 * s).sp, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+        Column(Modifier.fillMaxWidth().verticalScroll(scroll).testTag("stats_content")) {
+            PrimaryStatistics(s)
+            if (showDetails) {
+                Spacer(Modifier.height(12.dp * s))
+                SupplementaryStatistics(s)
+                Spacer(Modifier.height(12.dp * s))
+                Row(Modifier.fillMaxWidth().height(64.dp * s)
+                    .background(Color(0xFFFFF5EA), RoundedCornerShape(18.dp)).padding(horizontal = 16.dp * s),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    FigmaSvg("sun", s)
+                    Spacer(Modifier.width(10.dp * s))
+                    Text("距周末还有", color = Color(0xFFAB5E3B), fontSize = (14 * s).sp, modifier = Modifier.weight(1f))
+                    Text("3", color = Color(0xFFAB5E3B), fontSize = (30 * s).sp, fontWeight = FontWeight.Bold)
+                    Text(" 天", color = Color(0xFFAB5E3B), fontSize = (14 * s).sp)
+                }
+                Spacer(Modifier.height(24.dp * s))
+            } else Spacer(Modifier.height(9.dp * s))
+        }
+    }
+    }
+}
+
+@Composable
+private fun PrimaryStatistics(s: Float) {
+    Row(Modifier.fillMaxWidth().height(152.dp * s), horizontalArrangement = Arrangement.spacedBy(12.dp * s)) {
+        Column(Modifier.width(104.dp * s).fillMaxHeight().background(HomeCard, RoundedCornerShape(18.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            IconTile("focus", Color(0xFFFFF1E5), 36f, 12f, s)
+            Spacer(Modifier.height(10.dp * s))
+            Text("专注工作", color = HomeMuted, fontSize = (12 * s).sp)
+            Spacer(Modifier.height(10.dp * s))
+            Text("6h 30min", color = HomeInk, fontSize = (18 * s).sp, fontWeight = FontWeight.Bold)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp * s)) {
+            Row(Modifier.fillMaxWidth().height(46.dp * s).background(Color(0xFFFFF5EA), RoundedCornerShape(14.dp))
+                .padding(horizontal = 12.dp * s), verticalAlignment = Alignment.CenterVertically) {
+                Text("今日状态", color = Color(0xFF7A634F), fontSize = (12 * s).sp, modifier = Modifier.weight(1f))
+                FigmaSvg("fire", s)
+                Spacer(Modifier.width(7.dp * s))
+                Text("干劲满满", color = Color(0xFF9E5436), fontSize = (14 * s).sp)
+            }
+            Row(Modifier.fillMaxWidth().height(96.dp * s), horizontalArrangement = Arrangement.spacedBy(10.dp * s)) {
+                SmallStatistic("tea", "今日饮水", "5 次", Color(0xFFECF4F4), s, Modifier.weight(1f))
+                SmallStatistic("stretch", "伸展次数", "2次", Color(0xFFF1F4E8), s, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SmallStatistic(icon: String, title: String, value: String, tile: Color, s: Float, modifier: Modifier) {
+    Column(modifier.fillMaxHeight().background(HomeCard, RoundedCornerShape(18.dp)),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp * s, Alignment.CenterVertically)) {
+        IconTile(icon, tile, 28f, 9f, s)
+        Text(title, color = HomeMuted, fontSize = (12 * s).sp)
+        Text(value, color = HomeInk, fontSize = (19 * s).sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun IconTile(icon: String, color: Color, size: Float, radius: Float, s: Float) {
+    Box(Modifier.size((size * s).dp).background(color, RoundedCornerShape(radius.dp)), contentAlignment = Alignment.Center) {
+        FigmaSvg(icon, s)
+    }
+}
+
+@Composable
+private fun SupplementaryStatistics(s: Float) {
+    Row(Modifier.fillMaxWidth().height(108.dp * s), horizontalArrangement = Arrangement.spacedBy(12.dp * s)) {
+        Column(Modifier.weight(1f).fillMaxHeight().background(HomeCard, RoundedCornerShape(18.dp))
+            .padding(horizontal = 14.dp * s, vertical = 12.dp * s)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FigmaSvg("month", s)
+                Spacer(Modifier.width(6.dp * s))
+                Text("本月工作时长", color = Color(0xFF7A6657), fontSize = (12 * s).sp)
+            }
+            Spacer(Modifier.height(12.dp * s))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("1888", color = HomeInk, fontSize = (32 * s).sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(7.dp * s))
+                Text("小时", color = Color(0xFF7A6657), fontSize = (13 * s).sp)
+            }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp * s)) {
+            Row(Modifier.fillMaxWidth().height(49.dp * s).background(Color(0xFFF1F6EB), RoundedCornerShape(14.dp))
+                .padding(horizontal = 12.dp * s), verticalAlignment = Alignment.CenterVertically) {
+                Text("今日坐姿", color = Color(0xFF7A6657), fontSize = (12 * s).sp, modifier = Modifier.weight(1f))
+                Text("腰倍儿直", color = Color(0xFF738C57), fontSize = (14 * s).sp)
+            }
+            Row(Modifier.fillMaxWidth().height(49.dp * s).background(Color(0xFFF0F6F7), RoundedCornerShape(14.dp))
+                .padding(horizontal = 12.dp * s), verticalAlignment = Alignment.CenterVertically) {
+                FigmaSvg("moon", s)
+                Spacer(Modifier.width(6.dp * s))
+                Text("今日小憩", color = Color(0xFF7A6657), fontSize = (12 * s).sp, modifier = Modifier.weight(1f))
+                Text("30min", color = HomeInk, fontSize = (16 * s).sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+/**
+ * Buddy IP 旁的 GLM 关心语气泡。
+ *
+ * 半透明白底圆角气泡，带小尾巴指向角色。文案为模型生成或兜底文案。
+ * 不使用 emoji 或 Markdown，与首页风格一致。
+ */
+@Composable
+private fun BuddySpeechBubble(
+    message: String,
+    s: Float,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier
+            .width(220.dp * s)
+            .clipToBounds()
+            .semantics { contentDescription = message }
+            .testTag("buddy_greeting_bubble")
+    ) {
+        // 气泡主体（半透明白底，带圆角和阴影感）
+        Column(
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp * s))
+                .background(Color.White.copy(alpha = 0.92f))
+                .padding(horizontal = 14.dp * s, vertical = 10.dp * s)
+        ) {
+            Text(
+                message,
+                color = HomeInk,
+                fontSize = (13 * s).sp,
+                lineHeight = (19 * s).sp,
+                textAlign = TextAlign.Start
+            )
+        }
+        // 气泡小尾巴（指向 Buddy 角色）
+        Canvas(
+            Modifier.size(12.dp * s, 8.dp * s)
+                .align(Alignment.BottomStart)
+                .offset(x = 28.dp * s, y = (-1).dp * s)
+        ) {
+            val w = size.width
+            val h = size.height
+            val path = Path().apply {
+                moveTo(0f, 0f)
+                lineTo(w, 0f)
+                lineTo(w * 0.2f, h)
+                close()
+            }
+            drawPath(path, Color.White.copy(alpha = 0.92f))
+        }
+    }
+}
+
+/** Parse the original SVG asset, keeping its authored root dimensions and paths unchanged. */
+@Composable
+internal fun FigmaSvg(name: String, s: Float, modifier: Modifier = Modifier, folder: String = "home") {
+    val context = LocalContext.current
+    val loader = LocalHomeSvgLoader.current
+    val svg = remember(name, folder, loader) { loader(context.assets, "$folder/$name.svg") }
+    val width = svg.documentWidth
+    val height = svg.documentHeight
+    Canvas(modifier.requiredSize((width * s).dp, (height * s).dp).semantics { contentDescription = name }) {
+        drawIntoCanvas { canvas ->
+            val native = canvas.nativeCanvas
+            native.save()
+            native.scale(size.width / width, size.height / height)
+            svg.renderToCanvas(native, RenderOptions.create().viewPort(0f, 0f, width, height))
+            native.restore()
+        }
+    }
+}
