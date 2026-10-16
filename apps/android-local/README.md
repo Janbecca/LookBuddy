@@ -14,29 +14,28 @@
 8. 晨间首页使用 Figma 原始背景、桌前角色和 SVG 图标；点击统计便当顶部或上滑可展开，展开后仅下滑收起；拖动跟随手指，松手后平滑吸附，顶部不显示灰色点击反馈，底部中间图标现进入陪伴日记。
 7. 输入键盘出现或屏幕空间不足时页面可以滚动。
 
-设备列表和统计数据目前是演示数据，点击连接不需要真实蓝牙设备。本次未接入设备 SDK。开屏和首次注册按最新 Figma 使用用户提供的离线字体，详见 FONTS.md；其他页面沿用现有字体。
+产品页已接入统一 FastAPI 后端和 eufy App SDK；没有真实数据时显示空状态或明确的 Demo 标识。开屏和首次注册按最新 Figma 使用用户提供的离线字体，详见 FONTS.md；其他页面沿用现有字体。
 
 ## GLM 关心语气泡
 
-首页 Buddy IP 旁展示 GLM 生成的气泡关心语。后端调用智谱开放平台标准接口（适用于自建应用），返回 `show` 和 `message`；模型失败时使用符合相同规则的固定兜底文案。天气数据第一阶段为明确标注的模拟深圳天气。
+首页 Buddy IP 旁展示 GLM 生成的气泡关心语。该能力已经整合到统一的 `apps/backend` FastAPI 服务，返回 `show` 和 `message`；模型失败时使用固定兜底文案，没有真实天气时不会编造天气。
 
-### 第一阶段（当前）
+### 当前实现
 
-- 后端 `backend/app.py`，仅用 Python 标准库，提供 `POST /buddy/greeting`。
-- GLM Base URL / Model / API Key 均通过后端 `.env` 配置，不写入代码、不进入 Android 项目。
-- 使用智谱开放平台标准 API，不使用 Coding Plan 专用额度。
-- 模拟深圳天气三种场景：早间已落座、早间状态未知、下班前正在下雨。
+- 主后端提供 `POST /v1/buddy/greeting`，同时保留 `POST /buddy/greeting` 兼容入口。
+- GLM Base URL / Model / API Key 均通过主后端环境变量配置，不写入代码、不进入 Android 项目。
+- 使用 OpenAI 兼容的 Chat Completions 接口。
+- 没有真实天气数据时只生成普通陪伴问候；`evening_rain` 不会把模拟降雨当成事实。
 - 后端校验返回格式（`show` 为 bool、`message` 为 string、`show=true` 时非空）。
-- Android 调用后端，在首页 Buddy IP 旁展示气泡；不阻塞首页加载，避免重组导致重复请求。
+- Android 调用统一后端，在首页 Buddy IP 旁展示气泡；服务端按用户缓存并抑制重复请求。
 
 ### 联调步骤
 
-1. 启动后端：`cd backend; copy .env.example .env`（填入 GLM_API_KEY）→ `python app.py`，记下终端显示的局域网 IP（如 `192.168.x.x:5210`）。
-2. 修改 `BuddyGreeting.kt` 中 `BuddyGreetingConfig.EMULATOR_URL`，或直接在 `MorningHomeScreen.kt` 调用 `rememberBuddyGreeting(baseUrl = "http://你的局域网IP:5210")`。
-3. 手机连接与电脑相同的 Wi-Fi，安装调试 APK，打开首页即可看到气泡。
-4. 模拟器无需改 IP，默认 `http://10.0.2.2:5210` 已映射到开发机 localhost。
+1. 启动主后端：`cd ../../apps/backend; uv run uvicorn lookbuddy.main:app --app-dir src --reload --port 8000`。
+2. Android Debug 默认通过 `http://10.0.2.2:8000/` 访问宿主机；真机改为同一受信局域网内可访问的地址。
+3. 登录演示账号后打开首页，关心语和其他产品数据使用同一会话访问统一后端。
 
-实现：后端 `backend/app.py`；Android `app/src/main/java/com/lookbuddy/app/BuddyGreeting.kt`；气泡集成于 `MorningHomeScreen.kt`。
+实现：后端 `../backend/src/lookbuddy/product.py` 和 `../backend/src/lookbuddy/greeting_prompt.py`；Android 气泡集成于 `MorningHomeScreen.kt`。
 
 ## 心情日历
 

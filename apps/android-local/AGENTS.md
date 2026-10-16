@@ -2,7 +2,7 @@
 
 - 每次 LookBuddy 代码改动，必须同时更新本地工程与 `https://github.com/Janbecca/LookBuddy`，报告分支和完整提交号。仅本地修改或仅远端修改都不能称为已同步。
 - 实际运行工程为 `D:/Everything/Anker/projects/lookbuddy`。工作区其他 LookBuddy 目录及 output 下副本仅作历史资料或临时工作文件，不能默认为最新代码。
-- 对应远端目录为 `apps/android-local`，保留 `apps/android` 的独立实现，不混合两套代码。
+- 对应远端目录为 `apps/android-local`；它是仓库中唯一的 Android 产品实现，不再维护第二套 Android 工程。
 - 同步分支为 `codex/android-local-sync`，草稿 PR 为 `https://github.com/Janbecca/LookBuddy/pull/2`。
 - 修改前先读远端分支当前提交，逐文件核对本地与远端 Git blob SHA，保留双方改动；存在冲突时先处理，不能直接覆盖。
 - 当前通过已授权 GitHub 连接器同步；本工程无 `.git`，不能假定命令行 pull/push 或后台自动同步可用。

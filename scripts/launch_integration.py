@@ -120,10 +120,9 @@ def main():
                 print("PASS Web assets, health, account/preferences/diary after process restart, verified backup", flush=True)
                 checked([pnpm, "test:web"], ROOT, env)
                 if not args.skip_android:
-                    android = ROOT / "apps/android"
-                    cached = android / ".gradle-dist/gradle-8.13/bin/gradle.bat"
-                    executable = str(args.gradle.resolve()) if args.gradle else str(cached) if cached.exists() else str(android / "gradlew.bat")
-                    checked([executable, ":app:assembleDebug", ":app:testDebugUnitTest", ":app:lintDebug", "--offline", "--no-daemon"], android, env)
+                    android = ROOT / "apps/android-local"
+                    executable = str(args.gradle.resolve()) if args.gradle else str(android / "gradlew.bat")
+                    checked([executable, "-p", "integration", ":app:assembleDebug", ":app:testDebugUnitTest", ":app:lintDebug", "--offline", "--no-daemon"], android, env)
                 client.delete("/v1/account", headers=headers).raise_for_status()
         finally:
             stop()

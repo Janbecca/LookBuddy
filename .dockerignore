@@ -20,7 +20,6 @@
 **/*.aar
 **/local.properties
 apps/desktop
-apps/android
 apps/android-local
 docs
 output

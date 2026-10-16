@@ -4,7 +4,7 @@
 
 整合版补充：前后端接入工作先在独立 `codex/android-backend-integration` 分支完成，随后按用户授权整合至 `main`，已合入队友 `4b8bd07ff31220f9ad2f8de83409801ac99233c8`，不覆盖本同步分支。详见 `../../docs/android-integration.md`。整合版版本为1.3.2-integration，产品源码不变换目录，增加 SDK36/JDK17 构建入口；手机号仅为明确标注的演示登录，Mark 本轮不录视频。
 
-本目录对应本机 `D:/Everything/Anker/projects/lookbuddy`，与仓库原有的 `apps/android` 分别维护。
+本目录是仓库中唯一的 Android 产品工程；旧 `apps/android` 调试工程已经移除，其必要的 SDK、网络和设备能力已迁入本目录。
 
 同步分支：`codex/android-local-sync`。首次同步保存 2026-10-16 本机实际 App 的代码、资源、Gradle Wrapper 和截图基准，不合并两套 Android 实现。
 

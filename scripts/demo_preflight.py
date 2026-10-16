@@ -74,7 +74,7 @@ def main(argv=None):
         'apps/web/dist/models/pose_landmarker_lite.task',
         'apps/web/dist/wasm/vision_wasm_internal.wasm',
         'apps/desktop/release/LookBuddy-win32-x64/LookBuddy.exe',
-        'apps/android/app/build/outputs/apk/debug/app-debug.apk',
+        'apps/android-local/integration-build/app/outputs/apk/debug/app-debug.apk',
     ]:
         path = root / relative
         report('PASS' if path.is_file() and path.stat().st_size > 0 else 'FAIL', relative)

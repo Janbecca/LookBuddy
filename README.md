@@ -10,7 +10,7 @@ LookBuddy 是一个面向独立办公场景的低打扰健康陪伴系统。它�
 |---|---|---|
 | `apps/web` | React Web 端，本地 MediaPipe 感知、eufy Web SDK 直播与裸帧接入 | 已完成代码与自动化验证，待真机 |
 | `apps/desktop` | Electron Windows 桌面容器和悬浮桌宠 | 可运行、可打包，待真实摄像头长期验证 |
-| `apps/android` | Android 调试端、后端客户端和 eufy App SDK 设备能力 | 已接入 SDK 2.2.7，待真机 |
+| `apps/android-local` | Android 产品端、后端客户端和 eufy App SDK 设备能力 | 已接入 SDK 2.2.7，待真机 |
 | `apps/backend` | FastAPI 服务、认证、事件、提醒策略、学习、日记和数据删除 | 已完成核心能力 |
 | `packages/contracts` | 多端共用的 JSON Schema | 已投入使用 |
 | `scripts` | 合约导出、自动检查、演示预检和接口验收脚本 | 已投入使用 |
@@ -77,8 +77,8 @@ pnpm dev:desktop
 ### 5. 构建 Android
 
 ```powershell
-cd apps/android
-.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+cd apps/android-local
+.\gradlew.bat -p integration :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
 ```
 
 macOS/Linux 首次运行先执行 `chmod +x ./gradlew`，然后将命令中的 `.\gradlew.bat` 换成 `./gradlew`。Android SDK 凭证只在运行时输入，不写入仓库。

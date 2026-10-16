@@ -42,10 +42,10 @@ ESIotKit.start(ESIotAppConfig)
 
 核心代码：
 
-- `apps/android/app/src/main/java/com/lookbuddy/app/LookBuddyApplication.kt`：在 SDK 启动前提供 Android Context。
-- `apps/android/app/src/main/java/com/lookbuddy/app/sdk/EufySdkGateway.kt`：官方 SDK 封装、超时、错误映射和领域事件转换。
-- `apps/android/app/src/main/java/com/lookbuddy/app/LookBuddyViewModel.kt`：连接、刷新、事件、缩略图和控制状态。
-- `apps/android/app/src/main/java/com/lookbuddy/app/DebugScreen.kt`：凭证表单、设备信息、事件和二次确认 UI。
+- `apps/android-local/app/src/main/java/com/lookbuddy/app/sdk/EufySdkGateway.kt`：官方 SDK 封装、超时、错误映射和领域事件转换。
+- `apps/android-local/app/src/main/java/com/lookbuddy/app/ProductBackend.kt`：统一后端会话、产品状态和 SDK 生命周期。
+- `apps/android-local/app/src/main/java/com/lookbuddy/app/EufyCameraFeed.kt`：官方设备实时预览 Adapter。
+- `apps/android-local/app/src/main/java/com/lookbuddy/app/PersonalSettingsScreen.kt`：设备配置、事件查看和受控操作入口。
 
 SDK 事件转换为 `lookbuddy.event.v1`。原始 `MegaEvent` 只在 Gateway 内部短期缓存，SDK 类型不会进入后端契约。缩略图只在用户点击后读取并显示，不上传后端。
 

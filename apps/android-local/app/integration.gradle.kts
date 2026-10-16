@@ -70,7 +70,7 @@ configurations.all {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    implementation(files("../../android/app/libs/ESIotKit-2.2.7.aar"))
+    implementation(files("libs/ESIotKit-2.2.7.aar"))
     implementation("com.caverock:androidsvg-aar:1.4")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
