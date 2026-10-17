@@ -376,16 +376,37 @@ def mark(body: MarkIn, user: User = Depends(get_current_user), db: Session = Dep
 @router.get("/diary-page/{day}")
 def diary_page(day: date, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     from .diary_media import media_for_events
-    rows = [r for r in events_for(db, user, day) if live_event(r)]
+    rows = sorted((r for r in events_for(db, user, day) if live_event(r)),
+                  key=lambda r: (utc(r.occurred_at), r.id), reverse=True)
     media = media_for_events(db, user, [r.id for r in rows])
     value = db.scalar(select(Diary).where(Diary.user_id == user.id, Diary.diary_date == day))
     labels = {"memory.marked": "主动记录", "behavior.drink_detected": "饮水", "behavior.stretch_completed": "伸展",
               "behavior.break_completed": "休息", "work.session_completed": "陪伴"}
     return {"date": day, "content": value.content if value else "", "status": value.status if value else "empty",
-            "entries": [{"id": r.id, "time": utc(r.occurred_at).astimezone(ZoneInfo(user.timezone)).strftime("%H:%M"),
+            "generatedBy": value.generated_by if value else None,
+            "entries": [{"id": r.id, "occurredAt": utc(r.occurred_at).isoformat(),
+                "time": utc(r.occurred_at).astimezone(ZoneInfo(user.timezone)).strftime("%H:%M"),
                 "title": r.payload.get("note") or labels.get(r.type, "工位记录"), "description": r.payload.get("description", ""),
                 "category": "设备事件" if r.type == "device.security.event" else labels.get(r.type, "记录"),
+                "hasUploadedImage": uploaded_image(r) is not None,
                 "media": "not_recorded", "mediaItems": media.get(r.id, [])} for r in rows]}
+
+
+def uploaded_image(event):
+    value = event.payload.get("imageDataUrl")
+    if (isinstance(value, str) and len(value) <= 16 * 1024 * 1024
+            and re.match(r"^data:image/(png|jpeg|webp);base64,", value)):
+        return value
+    return None
+
+
+@router.get("/diary-images/{event_id}")
+def diary_image(event_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    event = db.scalar(select(DomainEvent).where(DomainEvent.id == event_id, DomainEvent.user_id == user.id))
+    image = uploaded_image(event) if event is not None and live_event(event) else None
+    if image is None:
+        raise HTTPException(404, "Image not found")
+    return {"imageDataUrl": image}
 
 
 def live_event(row):
@@ -436,4 +457,53 @@ async def greeting(body: GreetingIn, user: User = Depends(get_current_user), db:
 @router.get("/llm/status")
 def llm_status(user: User = Depends(get_current_user)):
     from .llm_service import model_status
-    return {"features": model_status(), "note": "Configured is not proof of a successful provider request"}
+    features = model_status()
+    features["chat"] = dict(features["greeting"])
+    return {"features": features, "note": "Configured is not proof of a successful provider request"}
+
+
+class ChatMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("content")
+    @classmethod
+    def nonempty(cls, value):
+        if not value.strip():
+            raise ValueError("Message must not be blank")
+        return value.strip()
+
+
+class ChatIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    messages: list[ChatMessage] = Field(min_length=1, max_length=21)
+
+    @field_validator("messages")
+    @classmethod
+    def conversation(cls, value):
+        if any(item.role != ("user" if i % 2 == 0 else "assistant") for i, item in enumerate(value)) or value[-1].role != "user":
+            raise ValueError("Conversation must alternate and end with a user message")
+        if sum(len(item.content) for item in value) > 24000:
+            raise ValueError("Conversation too long")
+        return value
+
+
+@router.post("/buddy/chat")
+async def buddy_chat(body: ChatIn, user: User = Depends(get_current_user)):
+    from .llm_service import complete, model_config
+    config = model_config("greeting")
+    if config is None:
+        raise HTTPException(503, "Model is not configured")
+    messages = [{"role": "system", "content": (
+        "你是 LookBuddy，温和自然的工位陪伴伙伴。用简短中文回应用户，并结合本轮对话。"
+        "不要声称看到摄像头、操作设备或已替用户完成事项；没有提供的事实不要编造。"
+        "不诊断健康、不评价工作效率。只根据对话内容回应。") }]
+    messages.extend(item.model_dump() for item in body.messages)
+    try:
+        reply = await complete(config, messages, timeout=25, max_tokens=768)
+    except httpx.TimeoutException as exc:
+        raise HTTPException(504, "Model request timed out") from exc
+    except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError) as exc:
+        raise HTTPException(502, "Model request failed") from exc
+    return {"message": reply, "source": "llm"}

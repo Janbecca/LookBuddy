@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.FrameLayout
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -33,6 +34,9 @@ import org.json.JSONObject
 internal fun DiaryEntryMedia(entry: JSONObject, candidates: JSONArray? = null) {
     val client = LocalProduct.current ?: return
     val identity = client.diaryIdentity
+    if (entry.optBoolean("hasUploadedImage") || entry.optString("imageDataUrl").isNotBlank()) {
+        DiaryUploadedImage(entry, client, identity)
+    }
     val scope = rememberCoroutineScope()
     val source = entry.optJSONArray("mediaItems") ?: JSONArray()
     var removed by remember(entry, identity) { mutableStateOf(setOf<String>()) }
@@ -105,6 +109,29 @@ internal fun DiaryEntryMedia(entry: JSONObject, candidates: JSONArray? = null) {
             DiaryMediaDialog(media, client, identity) { selected = null }
         }
     }
+}
+
+@Composable
+private fun DiaryUploadedImage(entry: JSONObject, client: ProductClient, identity: String) {
+    var bitmap by remember(entry, identity) { mutableStateOf<Bitmap?>(null) }
+    var error by remember(entry, identity) { mutableStateOf<String?>(null) }
+    var attempt by remember(entry, identity) { mutableIntStateOf(0) }
+    var expanded by remember(entry, identity) { mutableStateOf(false) }
+    LaunchedEffect(entry, identity, attempt) {
+        bitmap = null; error = null
+        try { bitmap = client.diaryMedia.uploadedImage(entry, identity) }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { error = "已上传图片读取失败" }
+    }
+    bitmap?.let { image ->
+        Image(image.asImageBitmap(), "已上传的工位日记图片", Modifier.fillMaxWidth().heightIn(max = 180.dp)
+            .clickable { expanded = true }.testTag("diary_uploaded_image_${entry.optString("id")}"), contentScale = ContentScale.Fit)
+        if (expanded) AlertDialog(onDismissRequest = { expanded = false }, title = { Text("已上传的工位图片") },
+            text = { Image(image.asImageBitmap(), "工位图片预览", Modifier.fillMaxWidth(), contentScale = ContentScale.Fit) },
+            confirmButton = { TextButton(onClick = { expanded = false }) { Text("关闭") } })
+    }
+    if (bitmap == null && error == null) Text("正在读取已上传图片…", color = CompanionMuted)
+    error?.let { Text(it, color = CompanionClay); TextButton(onClick = { attempt++ }) { Text("重试图片") } }
 }
 
 @Composable

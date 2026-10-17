@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -48,16 +49,23 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
-/** Local conversation UI state. User messages remain visibly unsent until a real service is wired. */
+/** Account-scoped conversation; failed messages stay available for explicit retry. */
 @Stable
 internal class BuddyChatState {
     var draft by mutableStateOf("")
     val unsent = mutableStateListOf<String>()
+    val messages = mutableStateListOf<Pair<String, String>>()
+    var sending by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
     var opening by mutableStateOf("今天想从哪件事说起？")
 
     fun enter(message: String? = null) {
-        if (unsent.isEmpty() && !message.isNullOrBlank()) opening = message
+        if (unsent.isEmpty() && messages.isEmpty() && !message.isNullOrBlank()) opening = message
     }
 
     fun submit() {
@@ -67,11 +75,48 @@ internal class BuddyChatState {
         draft = ""
     }
 
+    suspend fun sendPending(client: ProductClient) {
+        if (sending || unsent.isEmpty()) return
+        sending = true; error = null
+        val text = unsent.first()
+        val identity = client.diaryIdentity
+        try {
+            require(text.length <= 4000) { "单条消息请控制在4000字以内" }
+            val history = JSONArray()
+            // Keep complete user/assistant pairs; never send system roles from UI state.
+            messages.takeLast(2).forEach { (question, answer) ->
+                history.put(JSONObject().put("role", "user").put("content", question))
+                history.put(JSONObject().put("role", "assistant").put("content", answer.take(4000)))
+            }
+            history.put(JSONObject().put("role", "user").put("content", text))
+            val result = JSONObject(client.request("/v1/buddy/chat", "POST", JSONObject().put("messages", history), expectedIdentity = identity))
+            check(result.optString("source") == "llm" && result.optString("message").isNotBlank()) { "模型未返回有效回复，请重试" }
+            messages.add(text to result.getString("message")); unsent.removeAt(0)
+        } catch (e: CancellationException) { throw e }
+        catch (e: ProductHttpException) {
+            error = when (e.status) {
+                404 -> "当前后端尚未发布聊天接口，请更新后端 main 版本后重试"
+                503 -> "后端未启用聊天模型，请检查线上模型配置并重新发布"
+                502 -> "模型请求失败，请检查线上模型名称、权限与额度后重试"
+                504 -> "模型回复超时，请重试"
+                else -> "聊天请求失败（HTTP ${e.status}），请重试"
+            }
+        } catch (e: Exception) { error = if (e is IllegalArgumentException) e.message else "聊天连接失败，请检查网络后重试" }
+        finally { sending = false }
+    }
+
     companion object {
         val Saver = listSaver<BuddyChatState, String>(
-            save = { listOf(it.draft, it.opening) + it.unsent },
+            save = { listOf(it.draft, it.opening, "v2", JSONArray().apply {
+                it.messages.takeLast(4).forEach { (question, answer) -> put(JSONArray().put(question).put(answer)) }
+            }.toString()) + it.unsent },
             restore = { values -> BuddyChatState().apply {
-                draft = values[0]; opening = values[1]; unsent.addAll(values.drop(2))
+                draft = values[0]; opening = values[1]
+                if (values.getOrNull(2) == "v2") {
+                    val history = JSONArray(values[3])
+                    for (i in 0 until history.length()) messages.add(history.getJSONArray(i).getString(0) to history.getJSONArray(i).getString(1))
+                    unsent.addAll(values.drop(4))
+                } else unsent.addAll(values.drop(2))
             } }
         )
     }
@@ -86,6 +131,13 @@ internal fun BuddyChatScreen(
     onPage: (CompanionPage) -> Unit = {},
     designPreview: Boolean = false
 ) {
+    val client = LocalProduct.current
+    val scope = rememberCoroutineScope()
+    fun send() {
+        if (state.sending || state.unsent.isNotEmpty()) return
+        state.submit()
+        if (client != null) scope.launch { state.sendPending(client) }
+    }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val backgroundFocus = remember { FocusRequester() }
@@ -124,8 +176,8 @@ internal fun BuddyChatScreen(
                         lineHeight = (24 * s).sp), modifier = Modifier.testTag("chat_banner"))
             }
             val list = rememberLazyListState()
-            LaunchedEffect(state.unsent.size) {
-                if (!designPreview && state.unsent.isNotEmpty()) list.animateScrollToItem(state.unsent.size)
+            LaunchedEffect(state.unsent.size, state.messages.size, state.sending) {
+                if (!designPreview) list.animateScrollToItem(state.messages.size + state.unsent.size)
             }
             LazyColumn(state = list, modifier = Modifier.weight(1f).fillMaxWidth().testTag("chat_messages"),
                 contentPadding = PaddingValues(start = 20.dp * s, end = 20.dp * s, top = 23.dp * s, bottom = 16.dp * s),
@@ -134,18 +186,26 @@ internal fun BuddyChatScreen(
                     items(5) { index -> ChatBubble("", index % 2 == 0, s, designPreview = true) }
                 } else {
                     item { ChatBubble(state.opening, true, s) }
+                    itemsIndexed(state.messages) { _, (question, answer) ->
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp * s)) {
+                            ChatBubble(question, false, s)
+                            ChatBubble(answer, true, s)
+                        }
+                    }
                     itemsIndexed(state.unsent) { index, text ->
                         Column(horizontalAlignment = Alignment.End, modifier = Modifier.testTag("chat_unsent_$index")) {
                             ChatBubble(text, false, s)
-                            Text("暂未发送", color = CompanionInk, fontSize = 11.sp,
+                            Text(if (state.sending) "正在等待模型回复…" else "暂未发送", color = CompanionInk, fontSize = 11.sp,
                                 modifier = Modifier.padding(top = 4.dp, end = 52.dp * s))
+                            if (!state.sending && client != null) TextButton(onClick = { scope.launch { state.sendPending(client) } }) { Text("重试发送") }
+                            if (!state.sending) TextButton(onClick = { state.draft = state.unsent.removeAt(index); state.error = null }) { Text("重新编辑") }
                         }
                     }
                 }
             }
             Column(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(topStart = 12.dp * s, topEnd = 12.dp * s))
                 .padding(horizontal = 14.dp * s, vertical = 19.dp * s)) {
-                BasicTextField(value = state.draft, onValueChange = { state.draft = it },
+                BasicTextField(value = state.draft, onValueChange = { state.draft = it.take(4000) },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp * s, max = 144.dp)
                         .onGloballyPositioned { inputBounds = it.boundsInWindow() }
                         .background(Color(0xFFFBF9F9), RoundedCornerShape(36.dp * s))
@@ -156,7 +216,7 @@ internal fun BuddyChatScreen(
                         fontSize = 16.sp, lineHeight = 24.sp),
                     cursorBrush = SolidColor(CompanionClay), maxLines = 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { state.submit() }),
+                    keyboardActions = KeyboardActions(onSend = { send() }),
                     decorationBox = { input ->
                         Row(Modifier.padding(start = 24.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                             verticalAlignment = Alignment.CenterVertically) {
@@ -166,7 +226,7 @@ internal fun BuddyChatScreen(
                                     modifier = Modifier.padding(start = 30.dp * s))
                                 input()
                             }
-                            IconButton(onClick = { state.submit() }, enabled = state.draft.isNotBlank(),
+                            IconButton(onClick = { send() }, enabled = state.draft.isNotBlank() && !state.sending && state.unsent.isEmpty(),
                                 modifier = Modifier.size(48.dp).testTag("chat_send")) {
                                 Icon(painterResource(R.drawable.ic_chat_send), contentDescription = "发送消息",
                                     tint = if (state.draft.isNotBlank()) CompanionClay else CompanionMuted.copy(alpha = .4f),
@@ -174,7 +234,7 @@ internal fun BuddyChatScreen(
                             }
                         }
                     })
-                if (!designPreview) Text("聊天还未连接，内容暂留在本页", color = CompanionMuted,
+                if (!designPreview) Text(state.error ?: if (client == null) "聊天还未连接，内容暂留在本页" else "回复来自在线模型；本页对话随当前账号保留", color = CompanionMuted,
                     fontSize = 11.sp, modifier = Modifier.padding(start = 14.dp, top = 8.dp).testTag("chat_connection_hint"))
             }
             if (!imeVisible) CompanionNavigation(CompanionPage.Home, s, onPage)

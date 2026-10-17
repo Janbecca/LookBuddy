@@ -74,7 +74,7 @@ internal class ProductClient(private val context: Context, private val scope: Co
     private val prefs = context.getSharedPreferences("lookbuddy.product.connection", Context.MODE_PRIVATE)
     private val mutex = Mutex()
     private val marksMutex = Mutex()
-    private val transport = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS)
+    private val transport = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(35, TimeUnit.SECONDS)
         .followRedirects(false).followSslRedirects(false).build()
     private var generation = 0
     private var session = vault.read()?.takeIf { value ->

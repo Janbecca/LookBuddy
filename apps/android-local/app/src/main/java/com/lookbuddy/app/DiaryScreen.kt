@@ -88,7 +88,7 @@ internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}, initialDate: LocalDa
     suspend fun reload(): Boolean {
         loading = true
         return try {
-            page = JSONObject(product!!.request("/v1/diary-page/$date", expectedIdentity = identity)); loadError = null; true
+            page = product!!.diaryMedia.page(date, identity!!); loadError = null; true
         } catch (e: CancellationException) { throw e }
         catch (_: Exception) { loadError = "日记读取失败，请重试"; false }
         finally { loading = false }
@@ -108,7 +108,10 @@ internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}, initialDate: LocalDa
     suspend fun syncDeviceMedia() {
         if (product == null || identity == null || mediaSyncing) return
         mediaSyncing = true; mediaSyncError = null
-        try { product.diaryMedia.sync(date, identity); reload() }
+        try {
+            if (product.gateway.diaryConnected) product.diaryMedia.sync(date, identity)
+            if (reload()) actionSuccess = if (product.gateway.diaryConnected) "设备与云端记录已刷新" else "云端记录已刷新，已上传图片无需连接官方设备账号"
+        }
         catch (e: CancellationException) { throw e }
         catch (e: Exception) { mediaSyncError = e.message ?: "设备记录同步失败，请重试" }
         finally { mediaSyncing = false }
@@ -189,9 +192,16 @@ internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}, initialDate: LocalDa
             }
             actionSuccess?.let { Text(it, color = CompanionClay, modifier = Modifier.testTag("diary_success")) }
             if (busy) Text("日记同步中…", color = CompanionMuted, modifier = Modifier.testTag("diary_loading"))
-            Text("图片与录像在你主动查看时从设备读取，后端只保存引用。可用期限由设备服务决定。", color = CompanionMuted, fontSize = 11.sp)
+            Text("已上传图片随云端记录显示，无需连接官方设备账号。官方设备的历史图片与录像需连接设备账号后读取。", color = CompanionMuted, fontSize = 11.sp)
             TextButton(enabled = !mediaSyncing && !busy, onClick = { scope.launch { syncDeviceMedia() } }) {
-                Text(if (mediaSyncing) "正在同步设备记录…" else "同步当天设备记录")
+                Text(if (mediaSyncing) "正在刷新记录…" else if (product.gateway.diaryConnected) "同步当天设备与云端记录" else "刷新当天云端记录")
+            }
+            if (!product.gateway.diaryConnected) Text("连接官方设备账号后，可额外同步官方设备的历史记录。", color = CompanionMuted, fontSize = 11.sp)
+            page?.optString("uploadedImageWarning")?.takeIf { it.isNotBlank() }?.let { Text(it, color = CompanionClay) }
+            page?.optString("generatedBy")?.let { source ->
+                if (source == "template_fallback") Text("模型调用失败，本次日记使用模板生成，请检查线上模型服务。", color = CompanionClay)
+                else if (source == "template") Text("本次日记使用模板：当天有效记录不足或后端尚未配置模型。", color = CompanionMuted, fontSize = 11.sp)
+                else if (source == "llm" || source == "router") Text("本次日记由在线模型生成", color = CompanionMuted, fontSize = 11.sp)
             }
             mediaSyncError?.let { Text(it, color = CompanionClay, modifier = Modifier.testTag("diary_media_sync_error")) }
             loadError?.let { Text(it, color = CompanionClay, modifier = Modifier.testTag("diary_load_error")) }
@@ -208,7 +218,9 @@ internal fun DiaryScreen(s: Float, onChat: () -> Unit = {}, initialDate: LocalDa
         }
         if (showExample) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp * s)) {
-                DiaryExampleEntries.forEachIndexed { i, entry -> DiaryTimelineEntry(entry, i, s) { detail = entry } }
+                DiaryExampleEntries.reversed().forEach { entry ->
+                    DiaryTimelineEntry(entry, DiaryExampleEntries.indexOf(entry), s) { detail = entry }
+                }
             }
             Text("示例日记 · 来自设计稿，后续接入真实记录", color = CompanionMuted, fontSize = (11 * s).sp)
         } else {

@@ -30,6 +30,7 @@ def main():
                "LOOKBUDDY_DEMO_LOGIN_ENABLED": "true",
                "LOOKBUDDY_SCHEDULER_ENABLED": "false",
                "LOOKBUDDY_GREETING_API_KEY": "", "LOOKBUDDY_ROUTER_API_KEY": "",
+               "LOOKBUDDY_LLM_API_KEY": "",
                "LOOKBUDDY_PRODUCT_INTEGRATION_BASE_URL": origin}
         process = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "lookbuddy.main:app", "--app-dir", "src",

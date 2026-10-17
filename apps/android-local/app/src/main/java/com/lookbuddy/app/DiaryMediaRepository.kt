@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -11,6 +12,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import com.lookbuddy.app.sdk.DiaryDeviceEvent
 import com.lookbuddy.app.sdk.EufyDevice
@@ -37,6 +39,47 @@ private class EufyDiaryMediaSource(private val client: ProductClient) : DiaryMed
 /** No persistent media cache. Every access is scoped to the current app and SDK account. */
 internal class DiaryMediaRepository(private val client: ProductClient, private val source: DiaryMediaSource = EufyDiaryMediaSource(client)) {
     private val syncMutex = Mutex()
+
+    suspend fun page(day: LocalDate, identity: String): JSONObject {
+        val page = JSONObject(client.request("/v1/diary-page/$day", expectedIdentity = identity))
+        val entries = page.optJSONArray("entries") ?: return page
+        // New servers include exact instants; old servers expose HH:mm in account time.
+        val zone = ZoneId.of(client.user?.optString("timezone", "Asia/Shanghai") ?: "Asia/Shanghai")
+        val ordered = (0 until entries.length()).map { it to entries.getJSONObject(it) }
+            .sortedWith(compareByDescending<Pair<Int, JSONObject>> { (_, row) ->
+                runCatching { Instant.parse(row.optString("occurredAt")) }.getOrNull()
+                    ?: runCatching { day.atTime(LocalTime.parse(row.optString("time"))).atZone(zone).toInstant() }.getOrDefault(Instant.MIN)
+            }.thenByDescending { it.first })
+        page.put("entries", JSONArray().apply { ordered.forEach { put(it.second) } })
+        val legacy = (0 until entries.length()).map { entries.getJSONObject(it) }
+            .filter { !it.has("hasUploadedImage") && it.optString("id").isNotBlank() }
+        if (legacy.isNotEmpty()) {
+            // Compatibility with the deployed API that stores images only in event payloads.
+            try {
+                val events = JSONArray(client.request("/v1/timeline?limit=500", expectedIdentity = identity))
+                val byId = legacy.associateBy { it.getString("id") }
+                for (i in 0 until events.length()) {
+                    val event = events.getJSONObject(i)
+                    val entry = byId[event.optString("eventId")] ?: continue
+                    val image = event.optJSONObject("payload")?.optString("imageDataUrl").orEmpty()
+                    if (image.startsWith("data:image/") && image.length <= 16 * 1024 * 1024) entry.put("imageDataUrl", image)
+                }
+                if (events.length() == 500) page.put("uploadedImageWarning", "当前后端仅支持读取最近500条事件的图片；较早图片需更新后端后查看。")
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { page.put("uploadedImageWarning", "文字记录已加载，已上传图片读取失败，请刷新重试。") }
+        }
+        return page
+    }
+
+    suspend fun uploadedImage(entry: JSONObject, identity: String): Bitmap = withContext(Dispatchers.IO) {
+        checkIdentity(identity)
+        val encoded = if (entry.optString("imageDataUrl").isNotBlank()) entry.getString("imageDataUrl")
+            else JSONObject(client.request("/v1/diary-images/${entry.getString("id")}", expectedIdentity = identity)).getString("imageDataUrl")
+        check(Regex("^data:image/(png|jpeg|webp);base64,").containsMatchIn(encoded)) { "暂不支持此图片格式" }
+        val bitmap = decodeImage(encoded, 640)
+        checkIdentity(identity)
+        bitmap
+    }
 
     suspend fun sync(day: LocalDate, identity: String) = syncMutex.withLock {
         checkAccess(identity)
@@ -78,8 +121,12 @@ internal class DiaryMediaRepository(private val client: ProductClient, private v
     }
 
     private fun checkAccess(identity: String) {
-        check(identity == client.diaryIdentity && client.user != null) { "账号已切换，请重新打开日记" }
+        checkIdentity(identity)
         check(source.connected) { "请先在个人设置连接官方设备账号" }
+    }
+
+    private fun checkIdentity(identity: String) {
+        check(identity == client.diaryIdentity && client.user != null) { "账号已切换，请重新打开日记" }
     }
 
     suspend fun image(media: JSONObject, identity: String): Bitmap = withContext(Dispatchers.IO) {
@@ -87,17 +134,22 @@ internal class DiaryMediaRepository(private val client: ProductClient, private v
         val encoded = source.image(media.getString("providerDeviceRef"), media.getString("providerEventId"),
             Instant.parse(media.getString("capturedAt")), media.getString("providerMediaKey"))
         checkAccess(identity)
+        val bitmap = decodeImage(encoded, 1600)
+        checkAccess(identity)
+        bitmap
+    }
+
+    private fun decodeImage(encoded: String, maxEdge: Int): Bitmap {
         check(encoded.length <= 16 * 1024 * 1024) { "图片过大，无法预览" }
         val bytes = Base64.decode(encoded.substringAfter("base64,", encoded), Base64.DEFAULT)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         check(bounds.outWidth > 0 && bounds.outHeight > 0) { "设备图片无法解码" }
         var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > maxEdge) sample *= 2
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
             ?: error("设备图片无法解码")
-        checkAccess(identity)
-        bitmap
+        return bitmap
     }
 
     suspend fun player(media: JSONObject, identity: String): com.anker.esiotkit.media.event_stream.EventMediaPlayer {
