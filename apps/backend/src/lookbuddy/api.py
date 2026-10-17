@@ -39,6 +39,7 @@ from .learning import choose, settle_response
 from .scheduler import dispatch, snooze
 from .emotion_service import ingest as ingest_expression, observe as observe_expression, candidate as emotion_candidate
 from .schemas import (
+    DisplayClaimIn,
     DeviceCreate,
     DevicePublic,
     DiaryPublic,
@@ -356,6 +357,10 @@ def respond_reminder(
     reminder = db.scalar(select(Reminder).where(Reminder.id == reminder_id, Reminder.user_id == user.id))
     if reminder is None:
         raise HTTPException(status_code=404, detail="Reminder not found")
+    intervention = db.get(Intervention, reminder.id)
+    claim = intervention.context.get("displayClaimId") if intervention else None
+    if claim and claim != "legacy" and claim != body.claim_id:
+        raise HTTPException(409, "Reminder claimed by another client")
     if reminder.status != "pending":
         previous = db.scalar(select(ReminderResponse).where(ReminderResponse.reminder_id == reminder.id).order_by(desc(ReminderResponse.created_at)))
         if previous and previous.action == body.action and previous.snooze_minutes == snooze_minutes:
@@ -406,13 +411,25 @@ def get_intervention(intervention_id: str, user: User = Depends(get_current_user
 
 
 @router.post("/interventions/{intervention_id}/displayed", response_model=InterventionPublic)
-def display_intervention(intervention_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Intervention:
+def display_intervention(intervention_id: str, body: DisplayClaimIn | None = None,
+                         user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Intervention:
     lock_user(db, user.id)
     value = owned_intervention(db, user.id, intervention_id)
     if owned_session(db, user.id, value.session_id).status != "active":
         raise HTTPException(409, "Session is finished")
+    reminder = db.get(Reminder, value.id)
+    if value.status not in ACTIVE or (reminder and (
+        reminder.status != "pending" or utcnow() >= reminder.expires_at.replace(tzinfo=timezone.utc)
+    )):
+        raise HTTPException(409, "Reminder is no longer pending")
+    claim = body.claim_id if body else "legacy"
+    if value.displayed_at is not None:
+        if body and value.context.get("displayClaimId") == claim:
+            return value
+        raise HTTPException(409, "Reminder claimed by another client")
     require_display(db, value, utcnow())
     mark_displayed(value, utcnow())
+    value.context = {**value.context, "displayClaimId": claim}
     db.commit()
     db.refresh(value)
     return value

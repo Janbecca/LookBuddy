@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -35,7 +36,7 @@ internal val CompanionClay = Color(0xFFA86843)
 
 internal enum class CompanionPage { Home, Diary, Settings, Camera }
 
-/** Camera and reminder transports stay injectable; the production reminder source is unconnected. */
+/** Production HTTP reminders and injectable transports share the same renderer. */
 @Composable
 internal fun LookBuddyApp(
     initialPage: CompanionPage = CompanionPage.Home,
@@ -43,27 +44,55 @@ internal fun LookBuddyApp(
     reminderSource: HomeReminderSource? = null
 ) {
     var page by rememberSaveable { mutableStateOf(initialPage) }
+    var diaryDate by rememberSaveable { mutableStateOf<String?>(null) }
     val defaultCamera = remember { UnconnectedCameraFeed() }
     val camera = cameraFeed ?: defaultCamera
-    val reminders = rememberHomeReminderController()
-    val chat = rememberBuddyChatState()
-    var showChat by rememberSaveable { mutableStateOf(false) }
+    val product = LocalProduct.current
+    val accountIdentity = product?.diaryIdentity
+    val source = reminderSource ?: remember(product, accountIdentity) {
+        product?.takeIf { it.user != null }?.let { ReminderRepository(it, accountIdentity!!) }
+    }
+    val reminders = key(accountIdentity) { rememberHomeReminderController() }
+    val context = LocalContext.current
+    DisposableEffect(source, context) {
+        val manager = context.getSystemService(android.net.ConnectivityManager::class.java)
+        val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) { (source as? ReminderRepository)?.refresh() }
+        }
+        val registered = source is ReminderRepository && runCatching {
+            manager.registerDefaultNetworkCallback(callback)
+        }.isSuccess
+        onDispose { if (registered) runCatching { manager.unregisterNetworkCallback(callback) } }
+    }
+    val chat = key(accountIdentity) { rememberBuddyChatState() }
+    var showChat by rememberSaveable(accountIdentity) { mutableStateOf(false) }
     val openChat: (String?) -> Unit = { opening -> chat.enter(opening); showChat = true }
     val owner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
-    LaunchedEffect(reminderSource, owner) {
+    LaunchedEffect(source, owner, accountIdentity) {
         owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            reminderSource?.reminders?.collect { reminders.receive(it) }
+            source?.updates?.collect { reminders.update(it) }
         }
     }
     val acknowledge: (String) -> Unit = { id ->
         scope.launch {
-            try { reminderSource?.acknowledge(id) }
+            try { source?.acknowledge(id) }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { android.util.Log.d("HomeReminder", "Reminder acknowledgement unavailable") }
         }
     }
-    val savedPages = rememberSaveableStateHolder()
+    val respond: (String, HomeReminderResponse) -> Unit = { id, response ->
+        if (reminders.beginResponse(id)) scope.launch {
+            try {
+                source?.respond(id, response) ?: error("提醒服务未连接")
+                if (reminders.active?.id == id) reminders.acknowledge()
+            } catch (e: CancellationException) {
+                reminders.responseFailed(id, "提交已中断，请重试")
+                throw e
+            } catch (_: Exception) { reminders.responseFailed(id, "提交失败，请重试所选操作") }
+        }
+    }
+    val savedPages = key(accountIdentity) { rememberSaveableStateHolder() }
     val workPlayback = rememberWorkBuddyPlayback()
     BackHandler(showChat || page != CompanionPage.Home) {
         if (showChat) showChat = false else page = CompanionPage.Home
@@ -76,10 +105,13 @@ internal fun LookBuddyApp(
                 CompanionPage.Home -> MorningHomeScreen(onCamera = { page = CompanionPage.Camera },
                     onDiary = { page = CompanionPage.Diary }, onSettings = { page = CompanionPage.Settings },
                     reminders = reminders, onReminderAcknowledged = acknowledge,
+                    onReminderRespond = respond,
+                    onReminderDiary = { event -> diaryDate = event.diaryDate?.toString(); page = CompanionPage.Diary },
                     onReminderChat = { event -> openChat(event.message) })
                 else -> CompanionPageLayout(page, onPage = { page = it }) { s ->
                     when (page) {
-                        CompanionPage.Diary -> DiaryScreen(s, onChat = { openChat("今天有什么想和我说说的吗？") })
+                        CompanionPage.Diary -> DiaryScreen(s, onChat = { openChat("今天有什么想和我说说的吗？") },
+                            initialDate = diaryDate?.let(java.time.LocalDate::parse))
                         CompanionPage.Camera -> CameraScreen(camera, s)
                         CompanionPage.Settings -> PersonalSettingsScreen(s, onCamera = { page = CompanionPage.Camera })
                         else -> Unit

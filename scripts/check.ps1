@@ -1,6 +1,17 @@
+param([string]$GradlePath)
+
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $backendPython = Join-Path $projectRoot 'apps\backend\.venv\Scripts\python.exe'
+
+# The product's native wrapper targets AGP9/Gradle9; this SDK36/JDK17 entry uses AGP8.
+if (-not $GradlePath) {
+    $GradlePath = Join-Path $projectRoot '.git\codex-tooling\gradle-8.13\bin\gradle.bat'
+}
+if (-not (Test-Path -LiteralPath $GradlePath -PathType Leaf)) {
+    throw 'Pass -GradlePath C:\path\to\gradle-8.13\bin\gradle.bat for the Android integration checks.'
+}
+$GradlePath = (Resolve-Path -LiteralPath $GradlePath).Path
 
 if (-not (Test-Path -LiteralPath $backendPython)) {
     throw 'Backend virtual environment is missing. Run: cd apps/backend; uv sync --dev --no-editable'
@@ -38,7 +49,7 @@ if ($javaVersion -notmatch 'version "17\.') {
 }
 Push-Location "$projectRoot\apps\android-local"
 try {
-    .\gradlew.bat -p integration :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon
+    & $GradlePath -p integration :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon
     if ($LASTEXITCODE -ne 0) { throw 'Android checks failed' }
 
     $mergedManifest = '.\integration-build\app\intermediates\merged_manifest\debug\processDebugMainManifest\AndroidManifest.xml'

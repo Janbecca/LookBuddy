@@ -51,29 +51,35 @@ import java.util.Locale
 
 internal enum class Mood(val label: String, val asset: String, val image: Int? = null) {
     Happy("开心", "happy", R.drawable.mood_happy), Calm("平静", "calm", R.drawable.mood_calm),
-    Tired("有点累", "tired"), Sad("低落", "sad", R.drawable.mood_sad)
+    Tired("有点累", "tired"), Sad("低落", "sad", R.drawable.mood_sad),
+    Curious("好奇", "curious", R.drawable.mood_curious),
+    Thoughtful("思考", "thinking", R.drawable.mood_thinking),
+    Excited("振奋", "excited", R.drawable.mood_excited);
+
+    companion object {
+        fun fromBackend(value: String?): Mood? = entries.firstOrNull { it.name == value }
+    }
 }
 
-/** Visual choices without a Mood are not part of the persisted/API contract. */
-private data class MoodChoice(val key: String, val label: String, val mood: Mood? = null, val image: Int? = mood?.image)
-private val MoodChoices = listOf(Mood.Happy, Mood.Calm, Mood.Sad).map { MoodChoice(it.name, it.label, it) } + listOf(
-    MoodChoice("Curious", "好奇", image = R.drawable.mood_curious),
-    MoodChoice("Thoughtful", "思考", image = R.drawable.mood_thinking),
-    MoodChoice("Excited", "振奋", image = R.drawable.mood_excited),
-    MoodChoice(Mood.Tired.name, Mood.Tired.label, Mood.Tired)
-)
+private data class MoodChoice(val mood: Mood) {
+    val key get() = mood.name
+    val label get() = mood.label
+}
+private val MoodChoices = listOf(Mood.Happy, Mood.Calm, Mood.Sad, Mood.Curious,
+    Mood.Thoughtful, Mood.Excited, Mood.Tired).map(::MoodChoice)
 
 /** One record per local calendar date. Editing a mood never redraws the daily fortune. */
 internal class MoodStore(context: Context) {
     private val preferences = context.getSharedPreferences("lookbuddy_moods", Context.MODE_PRIVATE)
     fun read(date: LocalDate): Mood? = preferences.getString(date.toString(), null)
-        ?.let { value -> Mood.entries.firstOrNull { it.name == value } }
+        ?.let(Mood::fromBackend)
     fun week(date: LocalDate): Map<LocalDate, Mood> = (6L downTo 0L).mapNotNull { days ->
         val day = date.minusDays(days)
         read(day)?.let { day to it }
     }.toMap()
     fun save(date: LocalDate, mood: Mood): Boolean =
         preferences.edit().putString(date.toString(), mood.name).commit()
+    fun delete(date: LocalDate): Boolean = preferences.edit().remove(date.toString()).commit()
 }
 
 private val CalendarInk = Color(0xFF40362B)
@@ -94,7 +100,9 @@ internal fun MorningHomeScreen(
     previewTime: java.time.LocalDateTime? = null,
     reminders: HomeReminderController? = null,
     onReminderAcknowledged: (String) -> Unit = {},
-    onReminderChat: (HomeReminderEvent) -> Unit = {}
+    onReminderChat: (HomeReminderEvent) -> Unit = {},
+    onReminderRespond: (String, HomeReminderResponse) -> Unit = { _, _ -> },
+    onReminderDiary: (HomeReminderEvent) -> Unit = { onDiary() }
 ) {
     val context = LocalContext.current
     val store = remember(context) { MoodStore(context) }
@@ -114,11 +122,17 @@ internal fun MorningHomeScreen(
                 records = previewRecords ?: product?.moods ?: store.week(date)
                 open = true
             }, now = now, reminders = reminders, onReminderAcknowledged = onReminderAcknowledged,
-                onReminderChat = onReminderChat, desktopSyncVisible = !open)
+                onReminderChat = onReminderChat, onReminderRespond = onReminderRespond,
+                onReminderDiary = onReminderDiary, desktopSyncVisible = !open)
         }
         if (open) key(date) {
             val recordDate = date
-            MoodCalendar(recordDate, records, onDismiss = { open = false }, onSave = { mood ->
+            MoodCalendar(recordDate, records, onDismiss = { open = false }, onDelete = {
+                val success = if (product != null) product.deleteMood(recordDate)
+                    else withContext(Dispatchers.IO) { store.delete(recordDate) }
+                if (success) records = records - recordDate
+                success
+            }, onSave = { mood ->
                 val success = if (product != null) product.saveMood(recordDate, mood)
                     else withContext(Dispatchers.IO) { runCatching { store.save(recordDate, mood) }.getOrDefault(false) }
                 if (success) records = records + (recordDate to mood)
@@ -133,13 +147,13 @@ internal fun MoodCalendar(
     date: LocalDate,
     records: Map<LocalDate, Mood>,
     onDismiss: () -> Unit,
-    onSave: suspend (Mood) -> Boolean
+    onSave: suspend (Mood) -> Boolean,
+    onDelete: suspend () -> Boolean = { false }
 ) {
     var choosing by rememberSaveable(date.toString()) { mutableStateOf(records[date] == null) }
     var pending by remember { mutableStateOf<Mood?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf(false) }
-    var unconnected by remember { mutableStateOf<String?>(null) }
     val rotation = remember { Animatable(0f) }
     val alpha = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
@@ -187,11 +201,6 @@ internal fun MoodCalendar(
                                     .border(.6.dp, CalendarBorder, RoundedCornerShape(10.dp * s))
                                     .clickable(enabled = !busy, role = Role.RadioButton) {
                                         val mood = choice.mood
-                                        if (mood == null) {
-                                            unconnected = "${choice.label}暂未接入，不会保存记录"
-                                            return@clickable
-                                        }
-                                        unconnected = null
                                         busy = true; pending = mood; error = false
                                         scope.launch {
                                             // Let the selected state settle before persisting and turning the card.
@@ -212,9 +221,7 @@ internal fun MoodCalendar(
                                     }.semantics { this.selected = selected }.testTag("mood_${choice.key}"),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(6.dp * s, Alignment.CenterVertically)) {
-                                    if (choice.mood != null) MoodIcon(choice.mood, s)
-                                    else androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(choice.image!!), choice.label,
-                                        Modifier.size(48.dp * s), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+                                    MoodIcon(choice.mood, s)
                                     Text(choice.label, color = CalendarInk, fontSize = (11 * s).sp, lineHeight = (16 * s).sp)
                                 }
                             }
@@ -222,8 +229,6 @@ internal fun MoodCalendar(
                         }
                         }
                         }
-                        unconnected?.let { Text(it, color = Color(0xFFA85E3D), fontSize = (11 * s).sp,
-                            modifier = Modifier.testTag("mood_unconnected").semantics { liveRegion = LiveRegionMode.Polite }) }
                         if (error) Text("刚刚没记住，再轻点一次好吗？", color = Color(0xFFA85E3D),
                             fontSize = (10 * s).sp, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                     } else {
@@ -236,9 +241,18 @@ internal fun MoodCalendar(
                         }
                         Text("今日宜缓", color = CalendarInk, fontSize = (36 * s).sp,
                             lineHeight = (47 * s).sp, modifier = Modifier.testTag("daily_fortune").semantics { heading() })
+                        Text("固定暖心签", color = CalendarMuted, fontSize = (11 * s).sp)
                         Spacer(Modifier.height(4.dp * s))
                         Text("遇事则缓，事缓则圆", color = CalendarMuted, fontSize = (15 * s).sp,
                             lineHeight = (19 * s).sp)
+                        androidx.compose.material3.TextButton(enabled = !busy, modifier = Modifier.testTag("delete_mood"), onClick = {
+                            busy = true; error = false
+                            scope.launch {
+                                try { if (onDelete()) choosing = true else error = true }
+                                finally { busy = false }
+                            }
+                        }) { Text("删除今日心情", color = CalendarMuted) }
+                        if (error) Text("删除失败，请重试", color = CompanionClay)
                     }
                 }
                 Box(Modifier.fillMaxWidth().height(.75.dp).background(Color(0xB3E0D6C7)))

@@ -7,7 +7,7 @@ root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / "apps/backend/src"))
 
 from lookbuddy.schemas import (
-    DomainEventIn, EmotionCorrectionIn, InterventionPublic, ObservationIn,
+    DomainEventIn, EmotionCorrectionIn, InterventionPublic, ObservationIn, DisplayClaimIn,
     PreferencesPatch, PreferencesPublic, ReminderPublic, ReminderRespondRequest, StateSnapshotIn,
     VisionSampleIn, DemoInterventionIn, ObservationPublic, SnapshotResponse,
     ExpressionIn, ExpressionPublic, ExpressionFeatures, LocalCaptureIn,
@@ -20,7 +20,7 @@ from lookbuddy.schemas import UserPublic
 target = root / "packages/contracts/schemas"
 target.mkdir(parents=True, exist_ok=True)
 for model in (
-    DomainEventIn, EmotionCorrectionIn, InterventionPublic, ObservationIn,
+    DomainEventIn, EmotionCorrectionIn, InterventionPublic, ObservationIn, DisplayClaimIn,
     PreferencesPatch, PreferencesPublic, ReminderPublic, ReminderRespondRequest, StateSnapshotIn,
     VisionSampleIn, DemoInterventionIn, ObservationPublic, SnapshotResponse,
     ExpressionIn, ExpressionPublic, ExpressionFeatures, LocalCaptureIn,

@@ -11,7 +11,8 @@ def create_session(client, auth):
 
 def test_event_is_idempotent_and_diary_is_generated(client, auth):
     device_id, session_id = create_session(client, auth)
-    now = datetime.now(timezone.utc)
+    # The default test user is in Asia/Shanghai; diary dates are local calendar dates.
+    now = datetime.now(timezone(timedelta(hours=8)))
     event = {
         "schema": "lookbuddy.event",
         "version": 1,

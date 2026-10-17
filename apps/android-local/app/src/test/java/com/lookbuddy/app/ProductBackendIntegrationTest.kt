@@ -3,6 +3,7 @@ package com.lookbuddy.app
 import androidx.test.core.app.ApplicationProvider
 import android.content.Context
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -92,6 +93,17 @@ class ProductBackendIntegrationTest {
                 client.sync(); assertEquals(mood, client.moods[today])
             }
             val session = JSONObject(client.request("/v1/work/start", "POST", JSONObject().put("installationId", client.installation)))
+            val identity = client.diaryIdentity
+            val now = java.time.Instant.now().toString()
+            val snapshot = JSONObject(client.request("/v1/state-snapshots", "POST", JSONObject()
+                .put("sessionId", session.getString("id")).put("capturedAt", now)
+                .put("presence", "online").put("badPostureStreakMs", 60_000).put("lastDrinkAt", now)))
+            val reminders = ReminderRepository(client, identity)
+            val reminder = withTimeout(5000) { reminders.reminders.first() }
+            assertEquals(snapshot.getJSONObject("reminder").getString("id"), reminder.id)
+            assertEquals(HomeReminderKind.Posture, reminder.kind)
+            reminders.respond(reminder.id, HomeReminderResponse.Accepted)
+            assertEquals(0, org.json.JSONArray(client.request("/v1/reminders/pending")).length())
             assertEquals(session.getString("id"), JSONObject(client.request("/v1/work/start", "POST", JSONObject().put("installationId", client.installation))).getString("id"))
             assertTrue(client.mark().contains("不录制"))
             val diaryPage = JSONObject(client.request("/v1/diary-page/$today"))

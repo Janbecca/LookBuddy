@@ -97,7 +97,7 @@ class OwnerIn(BaseModel):
 
 class MoodIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    mood: Literal["Happy", "Calm", "Tired", "Sad"]
+    mood: Literal["Happy", "Calm", "Tired", "Sad", "Curious", "Thoughtful", "Excited"]
 
 
 class MarkIn(BaseModel):
@@ -375,14 +375,17 @@ def mark(body: MarkIn, user: User = Depends(get_current_user), db: Session = Dep
 
 @router.get("/diary-page/{day}")
 def diary_page(day: date, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from .diary_media import media_for_events
+    rows = [r for r in events_for(db, user, day) if live_event(r)]
+    media = media_for_events(db, user, [r.id for r in rows])
     value = db.scalar(select(Diary).where(Diary.user_id == user.id, Diary.diary_date == day))
     labels = {"memory.marked": "主动记录", "behavior.drink_detected": "饮水", "behavior.stretch_completed": "伸展",
               "behavior.break_completed": "休息", "work.session_completed": "陪伴"}
     return {"date": day, "content": value.content if value else "", "status": value.status if value else "empty",
             "entries": [{"id": r.id, "time": utc(r.occurred_at).astimezone(ZoneInfo(user.timezone)).strftime("%H:%M"),
                 "title": r.payload.get("note") or labels.get(r.type, "工位记录"), "description": r.payload.get("description", ""),
-                "category": labels.get(r.type, "记录"), "media": "not_recorded"} for r in events_for(db, user, day)
-                if live_event(r)]}
+                "category": "设备事件" if r.type == "device.security.event" else labels.get(r.type, "记录"),
+                "media": "not_recorded", "mediaItems": media.get(r.id, [])} for r in rows]}
 
 
 def live_event(row):

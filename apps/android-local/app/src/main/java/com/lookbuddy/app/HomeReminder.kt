@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlin.math.sin
 
 internal enum class HomeReminderKind(val backendKey: String, val label: String, val title: String, val message: String) {
@@ -76,13 +77,21 @@ internal data class HomeReminderEvent(
     val id: String,
     val kind: HomeReminderKind,
     val title: String = kind.title,
-    val message: String = kind.message
+    val message: String = kind.message,
+    val remote: Boolean = false,
+    val diaryDate: java.time.LocalDate? = null
 )
+
+internal enum class HomeReminderResponse(val backendKey: String, val label: String) {
+    Accepted("accepted", "接受"), Snoozed("snoozed", "稍后"), Ignored("ignored", "忽略")
+}
 
 /** Future transport boundary. Preview and backend events use the same controller and renderer. */
 internal interface HomeReminderSource {
     val reminders: Flow<HomeReminderEvent>
+    val updates: Flow<HomeReminderEvent?> get() = reminders.map { it }
     suspend fun acknowledge(id: String) {}
+    suspend fun respond(id: String, response: HomeReminderResponse) { acknowledge(id) }
 }
 
 @Stable
@@ -91,6 +100,10 @@ internal class HomeReminderController {
         private set
     var finished by mutableStateOf(false)
         private set
+    var responding by mutableStateOf(false)
+        private set
+    var responseError by mutableStateOf<String?>(null)
+        private set
     private var previewSerial = 0L
     private val acknowledged = linkedSetOf<String>()
 
@@ -98,6 +111,21 @@ internal class HomeReminderController {
         if (event.id.isBlank() || event.id in acknowledged || active?.id == event.id) return
         active = event
         finished = false
+        responding = false
+        responseError = null
+    }
+    fun update(event: HomeReminderEvent?) {
+        if (event == null) {
+            if (active?.remote == true) { active = null; responding = false; responseError = null }
+        } else receive(event)
+    }
+    fun beginResponse(id: String): Boolean {
+        if (active?.id != id || responding) return false
+        responding = true; responseError = null
+        return true
+    }
+    fun responseFailed(id: String, message: String) {
+        if (active?.id == id) { responding = false; responseError = message }
     }
     fun preview(kind: HomeReminderKind) {
         previewSerial++
@@ -110,13 +138,15 @@ internal class HomeReminderController {
         if (acknowledged.size > 128) acknowledged.remove(acknowledged.first())
         active = null
         finished = false
+        responding = false
+        responseError = null
         return id
     }
 
     companion object {
         val Saver = listSaver<HomeReminderController, String>(
             save = { state -> listOf(state.previewSerial.toString(), state.finished.toString(),
-                state.active?.id.orEmpty(), state.active?.kind?.name.orEmpty(), state.active?.title.orEmpty(),
+                state.active?.takeUnless { it.remote }?.id.orEmpty(), state.active?.kind?.name.orEmpty(), state.active?.title.orEmpty(),
                 state.active?.message.orEmpty()) + state.acknowledged },
             restore = { values -> HomeReminderController().apply {
                 previewSerial = values[0].toLong()
@@ -209,7 +239,9 @@ internal fun HomeReminderBubble(
     verticalScale: Float,
     onAcknowledged: (String) -> Unit,
     onChat: (HomeReminderEvent) -> Unit = {},
-    onDiary: () -> Unit = {}
+    onDiary: () -> Unit = {},
+    onRespond: (String, HomeReminderResponse) -> Unit = { _, _ -> },
+    onDiaryEvent: (HomeReminderEvent) -> Unit = { onDiary() }
 ) {
     val event = controller.active
     LaunchedEffect(event?.id) {
@@ -231,13 +263,26 @@ internal fun HomeReminderBubble(
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp * s)) {
             Text(display.message, color = CompanionInk, fontSize = (15f * s).sp, lineHeight = (24f * s).sp,
                 textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().testTag("reminder_message"))
-            if (display.kind.buttonLabel != null) Box(Modifier.width(80.dp * s)
+            if (display.remote) {
+                controller.responseError?.let { Text(it, color = CompanionClay, fontSize = (12f * s).sp,
+                    modifier = Modifier.testTag("reminder_response_error")) }
+                if (controller.responding) Text("正在提交…", color = CompanionMuted, fontSize = (12f * s).sp,
+                    modifier = Modifier.testTag("reminder_responding"))
+                HomeReminderResponse.entries.forEach { response ->
+                    TextButton(enabled = event?.id == display.id && !controller.responding,
+                        onClick = { onRespond(display.id, response) },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)
+                            .testTag("reminder_${response.backendKey}")) {
+                        Text(response.label, color = CompanionClay)
+                    }
+                }
+            } else if (display.kind.buttonLabel != null) Box(Modifier.width(80.dp * s)
                 .heightIn(min = maxOf(44.dp, 44.dp * s))
                 .clickable(enabled = event?.id == display.id && !hidden, role = Role.Button) {
                     val current = controller.active
                     controller.acknowledge()?.let(onAcknowledged)
                     if (current?.kind?.opensChat == true) onChat(current)
-                    if (current?.kind == HomeReminderKind.DiaryReady) onDiary()
+                    if (current?.kind == HomeReminderKind.DiaryReady) onDiaryEvent(current)
                 }.testTag("acknowledge_reminder"), contentAlignment = Alignment.Center) {
                 Box(Modifier.fillMaxWidth().heightIn(min = 28.dp * s)
                     .clip(RoundedCornerShape(14.dp * s)).background(Color.White.copy(alpha = .55f))

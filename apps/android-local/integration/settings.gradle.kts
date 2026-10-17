@@ -5,5 +5,3 @@ dependencyResolutionManagement {
 }
 rootProject.name = "LookBuddyProductIntegration"
 include(":app")
-project(":app").projectDir = file("../app")
-project(":app").buildFileName = "integration.gradle.kts"

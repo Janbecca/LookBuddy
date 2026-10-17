@@ -35,6 +35,8 @@ import java.util.concurrent.TimeUnit
 
 internal val LocalProduct = staticCompositionLocalOf<ProductClient?> { null }
 
+internal class ProductHttpException(val status: Int) : IllegalStateException("请求失败（HTTP $status），请检查后端或登录状态")
+
 /** Device-local, encrypted session. No passwords, SMS codes or request logs. */
 internal interface ProductSessionVault {
     fun read(): JSONObject?
@@ -97,6 +99,8 @@ internal class ProductClient(private val context: Context, private val scope: Co
     fun skipImport() = Unit
     fun importLegacy() = Unit
     val gateway by lazy { com.lookbuddy.app.sdk.RealEufySdkGateway(context) }
+    val diaryIdentity: String get() = "$endpoint:${user?.optString("id")}:$generation"
+    val diaryMedia by lazy { DiaryMediaRepository(this) }
 
     private fun clear() {
         generation++
@@ -118,9 +122,11 @@ internal class ProductClient(private val context: Context, private val scope: Co
         builder.method(method, body?.toString()?.toRequestBody("application/json; charset=utf-8".toMediaType()))
         return transport.newCall(builder.build()).execute().use { it.code to it.body?.string().orEmpty() }
     }
-    suspend fun request(path: String, method: String = "GET", body: JSONObject? = null, authenticated: Boolean = true): String = withContext(Dispatchers.IO) {
+    suspend fun request(path: String, method: String = "GET", body: JSONObject? = null, authenticated: Boolean = true,
+                        expectedIdentity: String? = null): String = withContext(Dispatchers.IO) {
         require(path.startsWith("/v1/") || path == "/buddy/greeting")
         mutex.withLock {
+            check(expectedIdentity == null || expectedIdentity == diaryIdentity) { "账号或设备连接已切换，请重新打开日记" }
             var response = exchange(path, method, body, if (authenticated) session?.optString("accessToken") else null)
             if (response.first == 401 && authenticated && session != null) {
                 val refreshed = exchange("/v1/auth/refresh", "POST", JSONObject().put("refreshToken", session!!.getString("refreshToken")), null)
@@ -131,7 +137,8 @@ internal class ProductClient(private val context: Context, private val scope: Co
                     withContext(Dispatchers.Main) { clear() }
                 }
             }
-            check(response.first in 200..299) { "请求失败（HTTP ${response.first}），请检查后端或登录状态" }
+            if (response.first !in 200..299) throw ProductHttpException(response.first)
+            check(expectedIdentity == null || expectedIdentity == diaryIdentity) { "账号或设备连接已切换，请重新打开日记" }
             response.second
         }
     }
@@ -170,7 +177,7 @@ internal class ProductClient(private val context: Context, private val scope: Co
         if (epoch != generation) return
         user = updatedUser
         WorkScheduleStore(context).save(WorkSchedule(java.time.LocalTime.parse(planned.getString("start")), java.time.LocalTime.parse(planned.getString("end"))))
-        moods = buildMap { for (i in 0 until records.length()) { val row = records.getJSONObject(i); put(LocalDate.parse(row.getString("date")), Mood.valueOf(row.getString("mood"))) } }
+        moods = parseMoodRecords(records)
         current = if (response == "null") null else JSONObject(response)
         summary = updatedSummary
         connection = "后端在线"
@@ -178,9 +185,19 @@ internal class ProductClient(private val context: Context, private val scope: Co
     fun startWork() = action { request("/v1/work/start", "POST", JSONObject().put("installationId", installation)); sync() }
     fun finishWork() = action { current?.let { request("/v1/sessions/${it.getString("id")}/finish", "POST", JSONObject()) }; sync() }
     suspend fun saveMood(day: LocalDate, mood: Mood): Boolean = try {
-        request("/v1/moods/$day", "PUT", JSONObject().put("mood", mood.name)); moods = moods + (day to mood); true
+        val identity = diaryIdentity
+        request("/v1/moods/$day", "PUT", JSONObject().put("mood", mood.name), expectedIdentity = identity)
+        check(identity == diaryIdentity)
+        moods = moods + (day to mood); true
     } catch (e: CancellationException) { throw e }
     catch (e: Exception) { error = e.message ?: "保存失败"; false }
+    suspend fun deleteMood(day: LocalDate): Boolean = try {
+        val identity = diaryIdentity
+        request("/v1/moods/$day", "DELETE", expectedIdentity = identity)
+        check(identity == diaryIdentity)
+        moods = moods - day; true
+    } catch (e: CancellationException) { throw e }
+    catch (e: Exception) { error = e.message ?: "删除失败"; false }
     suspend fun saveName(value: String): Boolean = try {
         user = JSONObject(request("/v1/me", "PATCH", JSONObject().put("displayName", value.ifBlank { "体验用户" }))); true
     } catch (e: CancellationException) { throw e }
@@ -221,6 +238,8 @@ internal class ProductClient(private val context: Context, private val scope: Co
         }
     }
     fun connectCamera(config: com.lookbuddy.app.sdk.EufyAccountConfig) = action {
+        generation++
+        gateway.logout()
         gateway.initialize(config)
         val devices = gateway.refreshDevices().filter { it.online }
         check(devices.isNotEmpty()) { "账号下没有在线设备" }

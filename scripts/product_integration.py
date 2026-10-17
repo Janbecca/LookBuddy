@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gradle", required=True, type=Path)
-    parser.add_argument("--lint", action="store_true", help="Also run lint (AGP8.11 custom build script analysis may crash)")
+    parser.add_argument("--lint", action="store_true", help="Also run the Android lint gate")
     args = parser.parse_args()
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))

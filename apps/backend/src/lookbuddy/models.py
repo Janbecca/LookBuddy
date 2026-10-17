@@ -54,6 +54,41 @@ class Device(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class MediaAsset(Base):
+    """Device references only. Never stores URLs, credentials or media bytes."""
+    __tablename__ = "media_assets"
+    __table_args__ = (UniqueConstraint("user_id", "device_id", "provider_event_id", "provider_media_key", name="uq_device_media"),)
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("med"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    device_id: Mapped[str] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), index=True)
+    provider: Mapped[str] = mapped_column(String(20), default="eufy")
+    provider_event_id: Mapped[str] = mapped_column(String(255))
+    provider_media_key: Mapped[str] = mapped_column(String(128))
+    kind: Mapped[str] = mapped_column(String(10))
+    role: Mapped[str] = mapped_column(String(20))
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    access_mode: Mapped[str] = mapped_column(String(20), default="client_sdk")
+    availability: Mapped[str] = mapped_column(String(20), default="unknown")
+    availability_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class EventMediaLink(Base):
+    __tablename__ = "event_media_links"
+    __table_args__ = (UniqueConstraint("event_id", "media_id", name="uq_event_media_link"),)
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("eml"))
+    event_id: Mapped[str] = mapped_column(ForeignKey("domain_events.id", ondelete="CASCADE"), index=True)
+    media_id: Mapped[str] = mapped_column(ForeignKey("media_assets.id", ondelete="CASCADE"), index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    # Keep a tombstone so subsequent device synchronization cannot undo removal.
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class WorkSession(Base):
     __tablename__ = "work_sessions"
 

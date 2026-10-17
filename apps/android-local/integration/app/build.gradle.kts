@@ -8,8 +8,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// The integration entry has a conventional build script for lint's Kotlin UAST.
+// All variants still compile the single product app's existing source tree.
+val productApp = rootProject.projectDir.resolve("../app")
 val desktopProperties = Properties().apply {
-    val source = project.file("../local.properties")
+    val source = productApp.resolve("../local.properties")
     if (source.isFile) source.inputStream().use { load(it) }
 }
 fun desktopConfigString(value: String): String = "\"" + value.replace("\\", "\\\\")
@@ -50,7 +53,7 @@ android {
         release {
             isMinifyEnabled = false
             buildConfigField("String", "API_BASE_URL", "\"https://replace-before-release.invalid/\"")
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), productApp.resolve("proguard-rules.pro"))
         }
     }
 
@@ -60,6 +63,17 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    sourceSets.configureEach {
+        val productSource = productApp.resolve("src/$name")
+        manifest.srcFile(productSource.resolve("AndroidManifest.xml"))
+        java.setSrcDirs(listOf(productSource.resolve("java"), productSource.resolve("kotlin")))
+        res.setSrcDirs(listOf(productSource.resolve("res")))
+        assets.setSrcDirs(listOf(productSource.resolve("assets")))
+        resources.setSrcDirs(listOf(productSource.resolve("resources")))
+        jniLibs.setSrcDirs(listOf(productSource.resolve("jniLibs")))
+        aidl.setSrcDirs(listOf(productSource.resolve("aidl")))
+        shaders.setSrcDirs(listOf(productSource.resolve("shaders")))
+    }
     packaging {
         resources.excludes += listOf(
             "/META-INF/{AL2.0,LGPL2.1}",
@@ -88,7 +102,7 @@ configurations.all {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    implementation(files("libs/ESIotKit-2.2.7.aar"))
+    implementation(files(productApp.resolve("libs/ESIotKit-2.2.7.aar")))
     implementation("com.caverock:androidsvg-aar:1.4")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
@@ -180,5 +194,5 @@ configurations.matching { it.name.endsWith("UnitTestRuntimeClasspath") }.configu
 
 
 
-layout.buildDirectory.set(file("../integration-build/app"))
+layout.buildDirectory.set(rootProject.projectDir.resolve("../integration-build/app"))
 android { testOptions { unitTests.isIncludeAndroidResources = true } }

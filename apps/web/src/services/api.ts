@@ -2,6 +2,8 @@ import { useAuth } from '../store/auth';
 import type { DomainEvent, EmotionLabel, ExpressionInput, ExpressionObservation, Intervention, Preferences, Reminder, TokenPair, VisionSample } from '../types';
 
 let refreshing: Promise<void> | null = null;
+// Per-tab claim survives request retries; other consumers must win their own claim.
+const displayClaimId = `web:${crypto.randomUUID()}`;
 
 export class ApiError extends Error {
   constructor(public readonly status: number, detail: unknown) {
@@ -80,11 +82,11 @@ export const api = {
   interventions: (namespace: 'live' | 'demo' = 'live') => request<Intervention[]>(`/v1/interventions?namespace=${namespace}`),
   intervention: (id: string) => request<Intervention>(`/v1/interventions/${id}`),
   pendingReminders: () => request<Reminder[]>('/v1/reminders/pending'),
-  displayIntervention: (id: string) => request<Intervention>(`/v1/interventions/${id}/displayed`, { method: 'POST' }),
+  displayIntervention: (id: string) => request<Intervention>(`/v1/interventions/${id}/displayed`, { method: 'POST', body: JSON.stringify({ claimId: displayClaimId }) }),
   sampleIntervention: (id: string, body: VisionSample) =>
     request<{ accepted: boolean; intervention: Intervention }>(`/v1/interventions/${id}/samples`, { method: 'POST', body: JSON.stringify(body) }),
   respondReminder: (id: string, action: 'accepted' | 'snoozed' | 'ignored') =>
-    request<Reminder>(`/v1/reminders/${id}/respond`, { method: 'POST', body: JSON.stringify({ action, snoozeMinutes: action === 'snoozed' ? 10 : undefined }) }),
+    request<Reminder>(`/v1/reminders/${id}/respond`, { method: 'POST', body: JSON.stringify({ action, claimId: displayClaimId, snoozeMinutes: action === 'snoozed' ? 10 : undefined }) }),
   generateDiary: (date: string) => request<{ content: string; candidates: unknown[] }>(`/v1/diaries/${date}/generate`, { method: 'POST' }),
 };
 
