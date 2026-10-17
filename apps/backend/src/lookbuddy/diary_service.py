@@ -10,8 +10,8 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .config import get_settings
 from .models import Diary, DomainEvent, User, utcnow
+from .llm_service import complete, model_config
 
 
 class DiaryCurator:
@@ -70,8 +70,8 @@ class DiaryWriter:
         if not candidates:
             return "今天还没有足够明确的工位记录。等有值得记住的片段时，我会帮你整理。", "template"
 
-        settings = get_settings()
-        if not (settings.router_base_url and settings.router_api_key and settings.router_model):
+        config = model_config("diary")
+        if config is None:
             return self._template(diary_date, candidates), "template"
 
         prompt = (
@@ -80,20 +80,8 @@ class DiaryWriter:
             f"日期：{diary_date.isoformat()}\n事实：{json.dumps(candidates, ensure_ascii=False)}"
         )
         try:
-            async with httpx.AsyncClient(timeout=20) as client:
-                response = await client.post(
-                    f"{settings.router_base_url.rstrip('/')}/chat/completions",
-                    headers={"Authorization": f"Bearer {settings.router_api_key}"},
-                    json={
-                        "model": settings.router_model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.4,
-                    },
-                )
-                response.raise_for_status()
-                content = response.json()["choices"][0]["message"]["content"].strip()
-                if content:
-                    return content, "router"
+            content = await complete(config, [{"role": "user", "content": prompt}])
+            return content, "router" if config.mode == "legacy" else "llm"
         except (httpx.HTTPError, KeyError, TypeError, ValueError):
             pass
         return self._template(diary_date, candidates), "template_fallback"

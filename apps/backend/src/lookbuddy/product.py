@@ -395,7 +395,7 @@ def live_event(row):
 @compatibility.post("/buddy/greeting")
 @router.post("/buddy/greeting")
 async def greeting(body: GreetingIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    settings = get_settings()
+    from .llm_service import complete, model_config
     if body.scene == "evening_rain":
         return {"show": False, "message": "", "source": "weather_unavailable", "weather_source": "unavailable"}
     cached = db.get(GreetingCache, user.id)
@@ -405,18 +405,16 @@ async def greeting(body: GreetingIn, user: User = Depends(get_current_user), db:
         return cached.result
     fallback = "慢慢进入工作状态就好，我陪着你。" if body.scene.startswith("morning") else "今天也辛苦啦，给自己留一点休息的时间。"
     result = {"show": body.recent_message != fallback, "message": fallback, "source": "fallback", "weather_source": "unavailable"}
-    if settings.greeting_base_url and settings.greeting_api_key:
+    config = model_config("greeting")
+    if config is not None:
         try:
-            async with httpx.AsyncClient(timeout=12) as client:
-                response = await client.post(settings.greeting_base_url.rstrip("/") + "/chat/completions",
-                    headers={"Authorization": "Bearer " + settings.greeting_api_key},
-                    json={"model": settings.greeting_model, "messages": [{"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": f"场景{body.scene}；在岗状态unknown；weather_valid=false；当地时间{datetime.now(ZoneInfo(user.timezone)).isoformat()}；上一句{body.recent_message}"}], "temperature": 0.5})
-                response.raise_for_status()
-                import json
-                parsed = json.loads(response.json()["choices"][0]["message"]["content"])
-                if type(parsed.get("show")) is bool and isinstance(parsed.get("message"), str) and (not parsed["show"] or parsed["message"].strip()):
-                    result = {**result, "show": parsed["show"], "message": parsed["message"][:200] if parsed["show"] else "", "source": "glm"}
+            text = await complete(config, [{"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"场景{body.scene}；在岗状态unknown；weather_valid=false；当地时间{datetime.now(ZoneInfo(user.timezone)).isoformat()}；上一句{body.recent_message}"}],
+                json_output=True, timeout=12, max_tokens=256)
+            import json
+            parsed = json.loads(text)
+            if isinstance(parsed, dict) and type(parsed.get("show")) is bool and isinstance(parsed.get("message"), str) and (not parsed["show"] or parsed["message"].strip()):
+                result = {**result, "show": parsed["show"], "message": parsed["message"][:200] if parsed["show"] else "", "source": "llm"}
         except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError):
             pass
     if result["message"] == body.recent_message:
@@ -433,3 +431,9 @@ async def greeting(body: GreetingIn, user: User = Depends(get_current_user), db:
     cached.scene, cached.generated_at, cached.result = body.scene, utcnow(), result
     db.commit()
     return result
+
+
+@router.get("/llm/status")
+def llm_status(user: User = Depends(get_current_user)):
+    from .llm_service import model_status
+    return {"features": model_status(), "note": "Configured is not proof of a successful provider request"}

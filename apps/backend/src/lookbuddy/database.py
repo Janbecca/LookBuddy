@@ -15,7 +15,7 @@ class Base(DeclarativeBase):
 
 def check_storage_access() -> None:
     settings = get_settings()
-    if settings.env != "competition":
+    if settings.env != "competition" or make_url(settings.database_url).get_backend_name() != "sqlite":
         return
     database = Path(make_url(settings.database_url).database).resolve()
     root = Path("/data").resolve()
@@ -33,9 +33,18 @@ def check_storage_access() -> None:
 
 def _make_engine(url: str | None = None):
     url = url or get_settings().database_url
-    connect_args = {"check_same_thread": False, "timeout": 10} if url.startswith("sqlite") else {}
+    parsed = make_url(url)
+    if parsed.drivername == "postgresql":
+        url = parsed.set(drivername="postgresql+psycopg")
+    connect_args = {"check_same_thread": False, "timeout": 10} if parsed.get_backend_name() == "sqlite" else {}
+    if parsed.get_backend_name() == "postgresql":
+        connect_args = {"connect_timeout": 10}
+        schema = get_settings().database_schema
+        if schema:
+            # Quote numeric schema names; omit public from the search path.
+            connect_args["options"] = f'-csearch_path="{schema}"'
     created_engine = create_engine(url, connect_args=connect_args, pool_pre_ping=True)
-    if url.startswith("sqlite"):
+    if parsed.get_backend_name() == "sqlite":
         @event.listens_for(created_engine, "connect")
         def enable_sqlite_foreign_keys(dbapi_connection, _connection_record):
             cursor = dbapi_connection.cursor()

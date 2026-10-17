@@ -3,6 +3,9 @@ import os
 os.environ["LOOKBUDDY_DATABASE_URL"] = "sqlite:///./lookbuddy-test.db"
 os.environ["LOOKBUDDY_JWT_SECRET"] = "test-secret-that-is-not-used-outside-tests"
 os.environ["LOOKBUDDY_SCHEDULER_ENABLED"] = "false"
+os.environ["LOOKBUDDY_LLM_API_KEY"] = ""
+os.environ["LOOKBUDDY_ROUTER_API_KEY"] = ""
+os.environ["LOOKBUDDY_GREETING_API_KEY"] = ""
 
 import pytest
 from fastapi.testclient import TestClient

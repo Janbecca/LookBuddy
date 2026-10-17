@@ -49,3 +49,16 @@ def test_competition_rejects_default_signing_configuration():
     with pytest.raises(ValidationError):
         Settings(env="competition", database_url="sqlite:////data/lookbuddy.db",
                  jwt_secret="short", cors_origins=["https://example.com"], _env_file=None)
+
+
+def test_competition_accepts_postgres_with_private_numeric_schema():
+    settings = Settings(env="competition", database_url="postgresql+psycopg://database.example/supabase_db",
+                        database_schema="19357380370", jwt_secret="x" * 40,
+                        cors_origins=["https://example.com"], _env_file=None)
+    assert settings.database_schema == "19357380370"
+
+
+@pytest.mark.parametrize("schema", ["public", "pg_catalog", 'bad"schema', "a,b", "a b"])
+def test_database_schema_rejects_unsafe_or_shared_names(schema):
+    with pytest.raises(ValidationError):
+        Settings(database_schema=schema, _env_file=None)
