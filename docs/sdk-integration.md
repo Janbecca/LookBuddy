@@ -47,7 +47,7 @@ ESIotKit.start(ESIotAppConfig)
 - `apps/android-local/app/src/main/java/com/lookbuddy/app/EufyCameraFeed.kt`：官方设备实时预览 Adapter。
 - `apps/android-local/app/src/main/java/com/lookbuddy/app/PersonalSettingsScreen.kt`：设备配置、事件查看和受控操作入口。
 
-SDK 事件转换为 `lookbuddy.event.v1`。原始 `MegaEvent` 只在 Gateway 内部短期缓存，SDK 类型不会进入后端契约。缩略图只在用户点击后读取并显示，不上传后端。
+SDK 事件转换为 `lookbuddy.event.v1`。工位日记通过专用接口同步历史事件和媒体引用；图片及录像由客户端按用户操作读取，不上传后端。SDK 原始对象、媒体路径和凭证不进入后端契约；历史查看会重新定位事件，不依赖进程内旧缓存。详见 [日记设备媒体](diary-device-media.md)。
 
 错误处理覆盖设备离线、能力未就绪、30 秒超时和 SDK `-1002/-1003/-1004`。真实设备效果仍需按照 [Android 真机验收表](android-eufy-device-acceptance.md) 验证。
 

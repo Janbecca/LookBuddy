@@ -77,3 +77,31 @@ def test_migration_adds_media_to_existing_database(client, auth):
     migrate(engine)
     migrate(engine)
     assert client.post('/v1/diary-device-events/batch', headers=auth, json=batch(own_device)).status_code == 200
+
+
+def test_conflict_rolls_back_prior_inserts_and_device_registration_is_stable(client, auth):
+    own_device = device(client, auth)
+    assert device(client, auth) == own_device
+    body = batch(own_device)
+    first = client.post('/v1/diary-device-events/batch', headers=auth, json=body)
+    assert first.status_code == 200
+    original = body['events'][0]
+    # A valid new event is inserted before a conflicting existing event. Neither
+    # its event, media nor links may survive the failed transaction.
+    failed = {'events': [{**original, 'providerEventId': 'new-before-conflict'},
+                         {**original, 'occurredAt': '2020-01-01T00:00:00Z'}]}
+    assert client.post('/v1/diary-device-events/batch', headers=auth, json=failed).status_code == 409
+    with SessionLocal() as db:
+        assert db.scalar(select(func.count()).select_from(DomainEvent)) == 1
+        assert db.scalar(select(func.count()).select_from(MediaAsset)) == 2
+        assert db.scalar(select(func.count()).select_from(EventMediaLink)) == 2
+
+
+def test_diary_media_uses_user_day_boundary(client, auth):
+    own_device = device(client, auth)
+    body = batch(own_device, occurredAt='2020-01-01T16:00:00Z')
+    assert client.post('/v1/diary-device-events/batch', headers=auth, json=body).status_code == 200
+    assert client.get('/v1/diary-page/2020-01-01', headers=auth).json()['entries'] == []
+    entries = client.get('/v1/diary-page/2020-01-02', headers=auth).json()['entries']
+    assert entries[0]['time'] == '00:00'
+    assert len(entries[0]['mediaItems']) == 2

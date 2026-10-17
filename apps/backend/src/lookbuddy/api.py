@@ -177,6 +177,16 @@ def delete_account(user: User = Depends(get_current_user), db: Session = Depends
 
 @router.post("/devices", response_model=DevicePublic, status_code=status.HTTP_201_CREATED)
 def create_device(body: DeviceCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Device:
+    if body.provider == "eufy" and body.provider_device_ref:
+        # Multiple clients can discover the same camera concurrently. Serialize
+        # registration so the provider SN maps to one stable backend identity.
+        lock_user(db, user.id)
+        existing = db.scalar(select(Device).where(Device.user_id == user.id,
+            Device.provider == "eufy", Device.provider_device_ref == body.provider_device_ref)
+            .order_by(Device.created_at, Device.id).limit(1))
+        if existing is not None:
+            db.commit()
+            return existing
     device = Device(user_id=user.id, **body.model_dump())
     db.add(device)
     db.commit()

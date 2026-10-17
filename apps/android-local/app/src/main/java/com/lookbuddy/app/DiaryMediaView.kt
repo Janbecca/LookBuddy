@@ -96,7 +96,7 @@ internal fun DiaryEntryMedia(entry: JSONObject, candidates: JSONArray? = null) {
                             catch (e: Exception) { error = e.message ?: "关联失败，请重试"; linking = false }
                             finally { working = false }
                         }
-                    }) { Text("$time · ${if (media.optString("kind") == "video") "录像" else "图片"} · ${media.getString("id").takeLast(6)}") }
+                    }) { Text("$time · ${if (media.optString("kind") == "video") "录像" else "图片"} ${index + 1}") }
                 }
             } }, confirmButton = { TextButton(enabled = !working, onClick = { linking = false }) { Text("关闭") } })
     }
@@ -140,7 +140,7 @@ private fun DiaryMediaDialog(media: JSONObject, client: ProductClient, identity:
     AlertDialog(onDismissRequest = dismiss, title = { Text(if (media.optString("kind") == "video") "设备历史录像" else "设备图片") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             bitmap?.let { Image(it.asImageBitmap(), "工位日记设备图片", Modifier.fillMaxWidth().aspectRatio(1.5f), contentScale = ContentScale.Fit) }
-            player?.takeIf { active }?.let { video -> DiaryVideoPlayer(video, { error = it }) }
+            player?.takeIf { active }?.let { video -> key(video) { DiaryVideoPlayer(video, { error = it }) } }
             if (bitmap == null && player == null && error == null) Text(if (active) "正在读取设备媒体…" else "已暂停")
             error?.let { Text(it, color = CompanionClay); TextButton(onClick = { bitmap = null; player = null; attempt++ }) { Text("重试") } }
             Text("临时读取设备已有媒体；不上传到 LookBuddy 后端。")
@@ -171,7 +171,10 @@ private fun DiaryVideoPlayer(player: EventMediaPlayer, onError: (String) -> Unit
         })
         onDispose { alive = false }
     }
-    AndroidView(factory = { context -> FrameLayout(context).apply { player.initVideoView(this); ready = true } },
+    AndroidView(factory = { context -> FrameLayout(context).apply {
+        try { player.initVideoView(this); ready = true }
+        catch (_: Exception) { report("当前设备的录像预览初始化失败，请重试") }
+    } },
         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f))
     LaunchedEffect(player, ready) {
         if (ready) {

@@ -12,22 +12,43 @@ import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import com.lookbuddy.app.sdk.DiaryDeviceEvent
+import com.lookbuddy.app.sdk.EufyDevice
+import com.anker.esiotkit.media.event_stream.EventMediaPlayer
+
+internal interface DiaryMediaSource {
+    val connected: Boolean
+    suspend fun devices(): List<EufyDevice>
+    suspend fun events(deviceSn: String, start: Long, end: Long): List<DiaryDeviceEvent>
+    suspend fun image(deviceSn: String, eventId: String, capturedAt: Instant, key: String): String
+    suspend fun player(deviceSn: String, eventId: String, capturedAt: Instant): EventMediaPlayer
+}
+
+private class EufyDiaryMediaSource(private val client: ProductClient) : DiaryMediaSource {
+    override val connected get() = client.gateway.diaryConnected
+    override suspend fun devices() = client.gateway.refreshDevices()
+    override suspend fun events(deviceSn: String, start: Long, end: Long) = client.gateway.fetchDiaryEvents(deviceSn, start, end)
+    override suspend fun image(deviceSn: String, eventId: String, capturedAt: Instant, key: String) =
+        client.gateway.loadDiaryImage(deviceSn, eventId, capturedAt, key)
+    override suspend fun player(deviceSn: String, eventId: String, capturedAt: Instant) =
+        client.gateway.createDiaryPlayer(deviceSn, eventId, capturedAt)
+}
 
 /** No persistent media cache. Every access is scoped to the current app and SDK account. */
-internal class DiaryMediaRepository(private val client: ProductClient) {
+internal class DiaryMediaRepository(private val client: ProductClient, private val source: DiaryMediaSource = EufyDiaryMediaSource(client)) {
     private val syncMutex = Mutex()
 
     suspend fun sync(day: LocalDate, identity: String) = syncMutex.withLock {
-        check(client.gateway.diaryConnected) { "请先在个人设置连接官方设备账号" }
+        checkAccess(identity)
         val zone = ZoneId.of(client.user?.optString("timezone", "Asia/Shanghai") ?: "Asia/Shanghai")
         val start = day.atStartOfDay(zone).toInstant().toEpochMilli()
         val end = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val devices = client.gateway.refreshDevices()
+        val devices = source.devices()
         val bound = JSONArray(client.request("/v1/devices", expectedIdentity = identity))
         val pending = mutableListOf<JSONObject>()
         for (device in devices) {
             check(identity == client.diaryIdentity) { "账号已切换，请重新打开日记" }
-            val events = client.gateway.fetchDiaryEvents(device.deviceSn, start, end)
+            val events = source.events(device.deviceSn, start, end)
             if (events.isEmpty()) continue
             var backendId: String? = null
             for (i in 0 until bound.length()) {
@@ -58,12 +79,12 @@ internal class DiaryMediaRepository(private val client: ProductClient) {
 
     private fun checkAccess(identity: String) {
         check(identity == client.diaryIdentity && client.user != null) { "账号已切换，请重新打开日记" }
-        check(client.gateway.diaryConnected) { "请先在个人设置连接官方设备账号" }
+        check(source.connected) { "请先在个人设置连接官方设备账号" }
     }
 
     suspend fun image(media: JSONObject, identity: String): Bitmap = withContext(Dispatchers.IO) {
         checkAccess(identity)
-        val encoded = client.gateway.loadDiaryImage(media.getString("providerDeviceRef"), media.getString("providerEventId"),
+        val encoded = source.image(media.getString("providerDeviceRef"), media.getString("providerEventId"),
             Instant.parse(media.getString("capturedAt")), media.getString("providerMediaKey"))
         checkAccess(identity)
         check(encoded.length <= 16 * 1024 * 1024) { "图片过大，无法预览" }
@@ -81,7 +102,7 @@ internal class DiaryMediaRepository(private val client: ProductClient) {
 
     suspend fun player(media: JSONObject, identity: String): com.anker.esiotkit.media.event_stream.EventMediaPlayer {
         checkAccess(identity)
-        val player = client.gateway.createDiaryPlayer(media.getString("providerDeviceRef"), media.getString("providerEventId"),
+        val player = source.player(media.getString("providerDeviceRef"), media.getString("providerEventId"),
             Instant.parse(media.getString("capturedAt")))
         if (identity != client.diaryIdentity) { player.release(); error("账号已切换，请重新打开日记") }
         return player
