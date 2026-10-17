@@ -31,8 +31,8 @@ android {
         // Preserve the product UI's minSdk 26. The original debug client retains 24.
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.4.3-companion-unified"
+        versionCode = 14
+        versionName = "1.4.4-default-server"
 
         // Optional pairing is debug-only; release keeps the bridge disabled.
         buildConfigField("String", "LOOKBUDDY_DESKTOP_URL", "\"\"")
@@ -48,11 +48,11 @@ android {
         debug {
             buildConfigField("String", "LOOKBUDDY_DESKTOP_URL", desktopConfigString(desktopUrl.get()))
             buildConfigField("String", "LOOKBUDDY_DESKTOP_TOKEN", desktopConfigString(desktopToken.get()))
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://sit-p-19357380370-lookbuddy-8080-hackathon.anker-launch.com/\"")
         }
         release {
             isMinifyEnabled = false
-            buildConfigField("String", "API_BASE_URL", "\"https://replace-before-release.invalid/\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://sit-p-19357380370-lookbuddy-8080-hackathon.anker-launch.com/\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), productApp.resolve("proguard-rules.pro"))
         }
     }

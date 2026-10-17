@@ -30,8 +30,8 @@ android {
         applicationId = "com.lookbuddy.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 13
-        versionName = "1.4.3-companion-unified"
+        versionCode = 14
+        versionName = "1.4.4-default-server"
 
         // Optional pairing is debug-only; release keeps the bridge disabled.
         buildConfigField("String", "LOOKBUDDY_DESKTOP_URL", "\"\"")

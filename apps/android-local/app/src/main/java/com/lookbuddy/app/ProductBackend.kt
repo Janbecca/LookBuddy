@@ -84,7 +84,7 @@ internal class ProductClient(private val context: Context, private val scope: Co
         value.optJSONObject("user")?.let { !it.isNull("username") && it.optString("username").isNotBlank() } == true
     }
     val installation = prefs.getString("installation", null) ?: UUID.randomUUID().toString().also { prefs.edit().putString("installation", it).apply() }
-    var endpoint by mutableStateOf(prefs.getString("endpoint", "http://10.0.2.2:8080")!!); private set
+    var endpoint by mutableStateOf(prefs.getString("endpoint", "https://sit-p-19357380370-lookbuddy-8080-hackathon.anker-launch.com")!!); private set
     var user by mutableStateOf(session?.optJSONObject("user")); private set
     val username: String get() = if (user?.isNull("username") == false) user?.optString("username").orEmpty() else ""
     var summary by mutableStateOf(JSONObject()); private set
@@ -285,7 +285,7 @@ internal fun ProductHost(content: @Composable () -> Unit) {
         }
     }
     if (editServer) AlertDialog(onDismissRequest = { editServer = false }, title = { Text("后端地址") },
-        text = { OutlinedTextField(address, { address = it }, label = { Text("HTTPS origin；模拟器 10.0.2.2:8080") }) },
+        text = { OutlinedTextField(address, { address = it }, label = { Text("后端地址（HTTPS）") }) },
         confirmButton = { TextButton(onClick = { client.connect(address); editServer = false }) { Text("连接") } },
         dismissButton = { TextButton(onClick = { editServer = false }) { Text("取消") } })
     if (importPrompt) AlertDialog(onDismissRequest = { client.skipImport(); importPrompt = false }, title = { Text("迁入这台设备的旧记录？") },
