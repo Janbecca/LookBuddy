@@ -63,9 +63,16 @@ internal class BuddyChatState {
     var sending by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
     var opening by mutableStateOf("今天想从哪件事说起？")
+    var reminderContext by mutableStateOf<String?>(null)
+        private set
 
-    fun enter(message: String? = null) {
-        if (unsent.isEmpty() && messages.isEmpty() && !message.isNullOrBlank()) opening = message
+    fun enter(message: String? = null, reminder: HomeReminderEvent? = null) {
+        reminderContext = reminder?.let {
+            JSONObject().put("id", it.id).put("state", it.kind.backendKey)
+                .put("title", it.title).put("message", it.message).toString()
+        }
+        if (reminder != null) opening = reminder.message
+        else if (unsent.isEmpty() && messages.isEmpty() && !message.isNullOrBlank()) opening = message
     }
 
     fun submit() {
@@ -89,7 +96,9 @@ internal class BuddyChatState {
                 history.put(JSONObject().put("role", "assistant").put("content", answer.take(4000)))
             }
             history.put(JSONObject().put("role", "user").put("content", text))
-            val result = JSONObject(client.request("/v1/buddy/chat", "POST", JSONObject().put("messages", history), expectedIdentity = identity))
+            val body = JSONObject().put("messages", history)
+            reminderContext?.let { body.put("reminder", JSONObject(it)) }
+            val result = JSONObject(client.request("/v1/buddy/chat", "POST", body, expectedIdentity = identity))
             check(result.optString("source") == "llm" && result.optString("message").isNotBlank()) { "模型未返回有效回复，请重试" }
             messages.add(text to result.getString("message")); unsent.removeAt(0)
         } catch (e: CancellationException) { throw e }
@@ -107,15 +116,17 @@ internal class BuddyChatState {
 
     companion object {
         val Saver = listSaver<BuddyChatState, String>(
-            save = { listOf(it.draft, it.opening, "v2", JSONArray().apply {
+            save = { listOf(it.draft, it.opening, "v3", JSONArray().apply {
                 it.messages.takeLast(4).forEach { (question, answer) -> put(JSONArray().put(question).put(answer)) }
-            }.toString()) + it.unsent },
+            }.toString(), it.reminderContext ?: "") + it.unsent },
             restore = { values -> BuddyChatState().apply {
                 draft = values[0]; opening = values[1]
-                if (values.getOrNull(2) == "v2") {
+                if (values.getOrNull(2) in listOf("v2", "v3")) {
                     val history = JSONArray(values[3])
                     for (i in 0 until history.length()) messages.add(history.getJSONArray(i).getString(0) to history.getJSONArray(i).getString(1))
-                    unsent.addAll(values.drop(4))
+                    val v3 = values[2] == "v3"
+                    if (v3) reminderContext = values[4].takeIf { it.isNotBlank() }
+                    unsent.addAll(values.drop(if (v3) 5 else 4))
                 } else unsent.addAll(values.drop(2))
             } }
         )

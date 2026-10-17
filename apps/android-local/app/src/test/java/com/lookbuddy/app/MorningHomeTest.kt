@@ -150,7 +150,8 @@ class MorningHomeTest {
         compose.onNodeWithTag("preview_normal").performClick()
         compose.onNodeWithTag("buddy_normal").assertExists()
         compose.onNodeWithTag("home_preview_label").assertDoesNotExist()
-        compose.onNodeWithTag("nav_camera").assertIsDisplayed()
+        compose.onNodeWithTag("nav_camera").assertDoesNotExist()
+        compose.onNodeWithTag("nav_diary").assertIsDisplayed()
     }
 
     @Test fun greetingsAutoAcknowledgeWithoutStartingACloudReminderSource() {

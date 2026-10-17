@@ -163,6 +163,47 @@ class UploadedDiaryAndChatTest {
         } finally { client.release(); scope.cancel(); server.shutdown() }
     }
 
+    @Test fun reminderContextSurvivesRestoreRetryAndFollowupAndClearsOnManualEntry(): Unit = runBlocking {
+        val server = MockWebServer(); server.start()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val client = client(server, scope)
+        try {
+            val event = HomeReminderEvent("worried-1", HomeReminderKind.Worried, message = "想说说话吗？")
+            var state = BuddyChatState()
+            state.enter(event.message, event)
+            state.draft = "好呀"; state.submit()
+            val saved = with(BuddyChatState.Saver) {
+                object : androidx.compose.runtime.saveable.SaverScope {
+                    override fun canBeSaved(value: Any) = true
+                }.save(state)!!
+            }
+            state = BuddyChatState.Saver.restore(saved)!!
+            server.enqueue(MockResponse().setResponseCode(502).setBody("{}"))
+            state.sendPending(client)
+            server.enqueue(MockResponse().setBody("""{"message":"我听着","source":"llm"}"""))
+            state.sendPending(client)
+            state.draft = "今天有点忙"; state.submit()
+            server.enqueue(MockResponse().setBody("""{"message":"慢慢来","source":"llm"}"""))
+            state.sendPending(client)
+            repeat(3) {
+                val context = JSONObject(server.takeRequest().body.readUtf8()).getJSONObject("reminder")
+                assertEquals(event.id, context.getString("id"))
+                assertEquals("worried", context.getString("state"))
+                assertEquals(event.title, context.getString("title"))
+                assertEquals(event.message, context.getString("message"))
+            }
+            state.enter("今天有什么想和我说说的吗？")
+            state.draft = "你好"; state.submit()
+            server.enqueue(MockResponse().setBody("""{"message":"你好呀","source":"llm"}"""))
+            state.sendPending(client)
+            assertFalse(JSONObject(server.takeRequest().body.readUtf8()).has("reminder"))
+            val next = HomeReminderEvent("happy-2", HomeReminderKind.Happy)
+            state.enter(next.message, next)
+            assertEquals("happy", JSONObject(state.reminderContext!!).getString("state"))
+            assertEquals(next.message, state.opening)
+        } finally { client.release(); scope.cancel(); server.shutdown() }
+    }
+
     @Test fun chatFailureKeepsMessageAndRetryIncludesSuccessfulHistory(): Unit = runBlocking {
         val server = MockWebServer(); server.start()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)

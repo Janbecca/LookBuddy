@@ -63,7 +63,8 @@ class CompactFortuneLayoutTest {
         org.junit.Assert.assertTrue("Reminder artwork must fit above the drawer", artwork.bottom <= drawer.top + 1f)
         org.junit.Assert.assertTrue("Reminder artwork stays inside the narrow screen", artwork.left >= 0 && artwork.right <= 320f)
         compose.onNodeWithTag("acknowledge_reminder").assertIsDisplayed()
-        compose.onNodeWithTag("nav_camera").assertIsDisplayed()
+        compose.onNodeWithTag("nav_camera").assertDoesNotExist()
+        compose.onNodeWithTag("nav_diary").assertIsDisplayed()
         compose.onNodeWithTag("home_companion_quote").assertDoesNotExist()
     }
 

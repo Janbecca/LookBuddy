@@ -263,6 +263,29 @@ private fun BuddyDiaryCarousel(s: Float, example: Boolean, onChat: () -> Unit) {
         listOf("17:23，你有点累了。我们一起伸展了一下。", "18:05，今天也辛苦啦，明天见！", "工位也被你收拾好了，今天的小事我都记着。"),
         listOf("13:57，吃饱啦，下午一起慢慢来。", "16:00，今天也有好好喝水。", "每一段小小的日常，都值得被记住。")
     )
+    if (fs > 1.15f || s < .88f) {
+        var adaptivePage by rememberSaveable { mutableIntStateOf(1) }
+        Row(Modifier.fillMaxWidth().testTag("diary_adaptive_bubbles"),
+            horizontalArrangement = Arrangement.spacedBy(10.dp * s)) {
+            Column(Modifier.width(100.dp * s).padding(top = 16.dp * s), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.fillMaxWidth().heightIn(min = 48.dp).background(Color.White, RoundedCornerShape(20.dp))
+                    .border(.75.dp, CompanionBorder, RoundedCornerShape(20.dp)).clickable(role = Role.Button, onClick = onChat)
+                    .padding(8.dp * s).testTag("diary_chat_entry")) {
+                    Text("和我聊一聊", color = CompanionInk, fontFamily = OnboardingDeviceFont,
+                        fontSize = (14 * s).sp, lineHeight = (22 * s).sp)
+                }
+                BuddyWebpOnce(BuddyClip.Introduction, Modifier.size(100.dp * s, 126.dp * s), "LookBuddy 欢迎你翻开日记")
+            }
+            Column(Modifier.weight(1f).padding(end = 4.dp * s).testTag("diary_bubbles"), verticalArrangement = Arrangement.spacedBy(10.dp * s)) {
+                groups[adaptivePage].forEachIndexed { index, text ->
+                    DiaryBubble(text, if (index == 0) 13f else 12f, s,
+                        Modifier.fillMaxWidth().testTag("diary_bubble_$index"), soft = index == 1)
+                }
+                TextButton(onClick = { adaptivePage = (adaptivePage + 1) % groups.size }) { Text("换一组日记气泡", color = CompanionClay) }
+            }
+        }
+        return
+    }
     Box(Modifier.fillMaxWidth().height(223.dp * s * fs)) {
         VerticalPager(pager, Modifier.fillMaxSize().testTag("diary_bubbles")) { page ->
             Box(Modifier.fillMaxSize()) {
@@ -296,19 +319,23 @@ private fun BuddyDiaryCarousel(s: Float, example: Boolean, onChat: () -> Unit) {
 /** Recorded events share the timeline style without borrowing example keyframes or video. */
 @Composable
 private fun DiaryRecordedEntry(entry: JSONObject, index: Int, s: Float, candidates: org.json.JSONArray? = null) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 106.dp * s).testTag("diary_record_$index"),
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 88.dp * s).testTag("diary_record_$index"),
         horizontalArrangement = Arrangement.spacedBy(10.dp * s)) {
-        Text(entry.optString("time"), color = CompanionMuted, fontSize = (11 * s).sp,
-            modifier = Modifier.width(45.dp * s))
-        Box(Modifier.width(14.dp * s).height(106.dp * s)) { FigmaSvg("timeline", s, folder = "pages") }
-        Column(Modifier.weight(1f).heightIn(min = 106.dp * s).background(Color.White, RoundedCornerShape(16.dp))
+        Text(entry.optString("time"), color = CompanionMuted, fontSize = (11 * s).coerceAtLeast(11f).sp, lineHeight = 16.sp,
+            modifier = Modifier.widthIn(min = 45.dp * s).testTag("diary_time_$index"), maxLines = 1)
+        Canvas(Modifier.width(14.dp * s).fillMaxHeight()) {
+            val x = size.width / 2
+            drawLine(CompanionBorder, androidx.compose.ui.geometry.Offset(x, 7.dp.toPx()), androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1.dp.toPx())
+            drawCircle(CompanionClay, radius = 3.dp.toPx(), center = androidx.compose.ui.geometry.Offset(x, 5.dp.toPx()))
+        }
+        Column(Modifier.weight(1f).heightIn(min = 88.dp * s).background(Color.White, RoundedCornerShape(16.dp))
             .border(.75.dp, CompanionBorder.copy(alpha = .55f), RoundedCornerShape(16.dp)).padding(12.dp * s),
             verticalArrangement = Arrangement.spacedBy(4.dp * s)) {
-            Text(entry.optString("title"), color = CompanionInk, fontSize = (14 * s).sp)
+            Text(entry.optString("title"), color = CompanionInk, fontSize = (14 * s).coerceAtLeast(14f).sp, lineHeight = 22.sp)
             entry.optString("description").takeIf { it.isNotBlank() }?.let {
-                Text(it, color = CompanionMuted, fontSize = (10 * s).sp)
+                Text(it, color = CompanionMuted, fontSize = (10 * s).coerceAtLeast(12f).sp, lineHeight = 18.sp)
             }
-            Text(entry.optString("category"), color = CompanionClay, fontSize = (9 * s).sp)
+            Text(entry.optString("category"), color = CompanionClay, fontSize = (9 * s).coerceAtLeast(11f).sp, lineHeight = 16.sp)
             DiaryEntryMedia(entry, candidates)
         }
     }

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from .models import Diary, DomainEvent, User, utcnow
 from .llm_service import complete, model_config
+from .diary_prompt import DIARY_SYSTEM_PROMPT
 
 
 class DiaryCurator:
@@ -68,19 +69,18 @@ class DiaryCurator:
 class DiaryWriter:
     async def write(self, diary_date: date, candidates: list[dict[str, Any]]) -> tuple[str, str]:
         if not candidates:
-            return "今天还没有足够明确的工位记录。等有值得记住的片段时，我会帮你整理。", "template"
+            return "这一天的记录还不多，先给这一页留一点空白。等你想记下一件小事时，我会帮你慢慢整理。", "template"
 
         config = model_config("diary")
         if config is None:
             return self._template(diary_date, candidates), "template"
 
-        prompt = (
-            "你是 LookBuddy 工位日记写作者。只能依据给定结构化事实写一篇简短中文日记；"
-            "不评价效率、不诊断健康、不补充未观察到的内容。语气温和自然，120到220字。\n"
-            f"日期：{diary_date.isoformat()}\n事实：{json.dumps(candidates, ensure_ascii=False)}"
-        )
+        # Selection scores are internal ranking, not a judgment of the user's day.
+        facts = [{key: item[key] for key in ("kind", "title", "facts") if key in item} for item in candidates]
+        prompt = f"日记日期：{diary_date.isoformat()}\n当日记录素材：{json.dumps(facts, ensure_ascii=False)}"
         try:
-            content = await complete(config, [{"role": "user", "content": prompt}])
+            content = await complete(config, [{"role": "system", "content": DIARY_SYSTEM_PROMPT},
+                                             {"role": "user", "content": prompt}])
             return content, "router" if config.mode == "legacy" else "llm"
         except (httpx.HTTPError, KeyError, TypeError, ValueError):
             pass
@@ -88,9 +88,9 @@ class DiaryWriter:
 
     @staticmethod
     def _template(diary_date: date, candidates: list[dict[str, Any]]) -> str:
-        lines = [f"{diary_date.isoformat()}，今天有这些值得记住的片段："]
+        lines = [f"{diary_date.isoformat()}，先把这一天的几个小片段记在这里："]
         lines.extend(f"• {candidate['title']}。" for candidate in candidates)
-        lines.append("这些记录只描述可见行为，不评价你今天做得好不好。")
+        lines.append("这一页先替你收好。还有想说的话，等你愿意的时候，我们再慢慢添上。")
         return "\n".join(lines)
 
 

@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lookbuddy.app.ui.theme.LookBuddyTheme
 
 private val Ink = Color(0xFF344740)
 private val Muted = Color(0xFF78877E)
@@ -60,7 +61,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
         )
         setContent {
-            MaterialTheme {
+            LookBuddyTheme {
                 ProductHost { LookBuddyStartup { LookBuddyApp(cameraFeed = LocalProduct.current?.camera) } }
             }
         }

@@ -107,7 +107,7 @@ internal fun LookBuddyApp(
                     reminders = reminders, onReminderAcknowledged = acknowledge,
                     onReminderRespond = respond,
                     onReminderDiary = { event -> diaryDate = event.diaryDate?.toString(); page = CompanionPage.Diary },
-                    onReminderChat = { event -> openChat(event.message) })
+                    onReminderChat = { event -> chat.enter(event.message, event); showChat = true })
                 else -> CompanionPageLayout(page, onPage = { page = it }) { s ->
                     when (page) {
                         CompanionPage.Diary -> DiaryScreen(s, onChat = { openChat("今天有什么想和我说说的吗？") },
@@ -139,7 +139,7 @@ internal fun CompanionPageLayout(
     }
 }
 
-/** Shared four-tab bar, matching the Figma diary screen. */
+/** Shared product tabs; camera remains reachable through Home and device settings. */
 @Composable
 internal fun CompanionNavigation(
     page: CompanionPage,
@@ -149,9 +149,9 @@ internal fun CompanionNavigation(
 ) {
     val nativeBottom = with(LocalDensity.current) { WindowInsets.navigationBars.getBottom(this).toDp() }
     Row(modifier.fillMaxWidth().background(Color.White)
-        .padding(bottom = maxOf(nativeBottom, 34.dp * s)).height(56.dp * s)
+        .padding(bottom = maxOf(nativeBottom, 34.dp * s)).height(maxOf(56.dp * s, 56.dp))
         .padding(horizontal = 12.dp * s), verticalAlignment = Alignment.CenterVertically) {
-        listOf(CompanionPage.Home, CompanionPage.Camera, CompanionPage.Diary, CompanionPage.Settings).forEach { destination ->
+        listOf(CompanionPage.Home, CompanionPage.Diary, CompanionPage.Settings).forEach { destination ->
             val active = page == destination
             val label = when (destination) {
                 CompanionPage.Home -> "首页"
@@ -161,7 +161,7 @@ internal fun CompanionNavigation(
             }
             val icon = destination.name.lowercase()
             val tint = if (active) CompanionClay else CompanionMuted
-            Box(Modifier.weight(1f).height(50.dp * s).clickable(role = Role.Tab) { onPage(destination) }
+            Box(Modifier.weight(1f).height(maxOf(50.dp * s, 48.dp)).clickable(role = Role.Tab) { onPage(destination) }
                 .semantics { contentDescription = label; selected = active }
                 .testTag("nav_" + icon), contentAlignment = Alignment.Center) {
                 // Figma SVG dimensions preserve the exact icon geometry inside its 26dp slot.

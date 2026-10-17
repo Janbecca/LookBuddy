@@ -31,8 +31,8 @@ android {
         // Preserve the product UI's minSdk 26. The original debug client retains 24.
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "1.4.1-chat-diary"
+        versionCode = 13
+        versionName = "1.4.3-companion-unified"
 
         // Optional pairing is debug-only; release keeps the bridge disabled.
         buildConfigField("String", "LOOKBUDDY_DESKTOP_URL", "\"\"")

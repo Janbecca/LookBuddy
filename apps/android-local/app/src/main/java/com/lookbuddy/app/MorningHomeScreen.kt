@@ -157,7 +157,7 @@ internal fun MorningHomeContent(
         val density = LocalDensity.current
         val topInset = with(density) { WindowInsets.statusBars.getTop(this).toDp().value }
         val bottomInset = maxOf(with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }, 34.dp * s)
-        val navHeight = 56.dp * s
+        val navHeight = maxOf(56.dp * s, 56.dp)
         val drawerProgress = drawerMotion.progress
         val drawerHeight = (183f + 255f * drawerProgress).dp * s
 

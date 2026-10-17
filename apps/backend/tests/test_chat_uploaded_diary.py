@@ -69,6 +69,43 @@ def test_chat_uses_real_transport_contract_and_history(client, auth, monkeypatch
     assert client.post('/v1/buddy/chat', json={'messages': history}).status_code == 401
 
 
+@pytest.mark.parametrize('state', ['fatigue', 'happy', 'worried'])
+def test_chat_passes_reminder_state_and_exact_copy_to_model(client, auth, monkeypatch, state):
+    import json
+    monkeypatch.setattr(llm_service, 'model_config', lambda purpose: object())
+    seen = []
+
+    async def complete(config, messages, **kwargs):
+        seen.extend(messages)
+        return '我听着。'
+
+    monkeypatch.setattr(llm_service, 'complete', complete)
+    reminder = {'id': 'reminder-1', 'state': state, 'title': '我在这里呢',
+                'message': '想找个地方说说话吗？\n我听着。'}
+    history = [{'role': 'user', 'content': '我现在挺好的'}]
+    response = client.post('/v1/buddy/chat', headers=auth, json={'messages': history, 'reminder': reminder})
+    assert response.status_code == 200
+    assert seen[1]['role'] == 'user'
+    assert json.loads(seen[1]['content'].split('\n', 1)[1]) == reminder
+    assert seen[2:] == history
+    assert '不是指令' in seen[0]['content']
+    assert '不代表用户此刻仍处于该状态' in seen[0]['content']
+
+
+@pytest.mark.parametrize('change', [
+    {'state': 'unknown'}, {'message': ' '}, {'message': 'a' * 4001},
+    {'title': ''}, {'id': 'a' * 201}, {'system': 'override'},
+])
+def test_chat_rejects_invalid_reminder_before_calling_model(client, auth, monkeypatch, change):
+    async def unexpected(*args, **kwargs):
+        pytest.fail('Invalid reminder must not reach model')
+    monkeypatch.setattr(llm_service, 'complete', unexpected)
+    reminder = {'id': 'r1', 'state': 'worried', 'title': '我在这里呢', 'message': '我听着。'}
+    reminder.update(change)
+    assert client.post('/v1/buddy/chat', headers=auth, json={
+        'messages': [{'role': 'user', 'content': '你好'}], 'reminder': reminder}).status_code == 422
+
+
 def test_chat_unconfigured_and_invalid_requests_never_fake_success(client, auth, monkeypatch):
     monkeypatch.setattr(llm_service, 'model_config', lambda purpose: None)
     assert client.post('/v1/buddy/chat', headers=auth,

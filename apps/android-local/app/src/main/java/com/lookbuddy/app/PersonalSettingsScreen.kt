@@ -46,6 +46,7 @@ import kotlinx.coroutines.withContext
 internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
     val context = LocalContext.current
     val product = LocalProduct.current
+    val openBackend = LocalBackendSettings.current
     val preferences = remember(context) { context.getSharedPreferences("lookbuddy_onboarding", Context.MODE_PRIVATE) }
     var nickname by remember(product?.user?.optString("displayName")) { mutableStateOf(product?.user?.optString("displayName") ?: preferences.getString("nickname", "") ?: "") }
     var dialog by rememberSaveable { mutableStateOf<String?>(null) }
@@ -159,6 +160,10 @@ internal fun PersonalSettingsScreen(s: Float, onCamera: () -> Unit) {
                     "设备连接" -> EufyConnectionForm()
                 }
                 if (selected == "系统设置") {
+                    if (product != null) Text("后端状态：${product.connection}", color = CompanionMuted)
+                    if (openBackend != null) TextButton(onClick = { dialog = null; openBackend() }, modifier = Modifier.testTag("settings_backend")) {
+                        Text("后端设置", color = CompanionClay)
+                    }
                     Text("工作时间（每日）", color = CompanionInk)
                     TextButton(onClick = { pickWorkTime(true) }, modifier = Modifier.testTag("work_start_time")) {
                         Text("上班时间  ${schedule.start}", color = CompanionClay)

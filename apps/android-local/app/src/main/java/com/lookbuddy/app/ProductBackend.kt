@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -34,6 +36,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import java.util.concurrent.TimeUnit
 
 internal val LocalProduct = staticCompositionLocalOf<ProductClient?> { null }
+internal val LocalBackendSettings = staticCompositionLocalOf<(() -> Unit)?> { null }
 
 internal class ProductHttpException(val status: Int) : IllegalStateException("请求失败（HTTP $status），请检查后端或登录状态")
 
@@ -257,6 +260,11 @@ internal fun ProductHost(content: @Composable () -> Unit) {
     val lifecycle = LocalLifecycleOwner.current
     var editServer by remember { mutableStateOf(false) }
     var address by remember { mutableStateOf(client.endpoint) }
+    val notifications = remember { SnackbarHostState() }
+    val openBackend = { address = client.endpoint; editServer = true }
+    LaunchedEffect(client.error) {
+        if (client.error.isNotBlank()) notifications.showSnackbar(client.error)
+    }
     val zone = client.user?.optString("timezone", "Asia/Shanghai") ?: java.time.ZoneId.systemDefault().id
     val clock = remember(zone) { { java.time.LocalDateTime.now(java.time.ZoneId.of(zone)) } }
     var importPrompt by remember(client.user?.optString("id")) { mutableStateOf(client.user != null && client.hasLegacy && !client.importOffered()) }
@@ -270,13 +278,10 @@ internal fun ProductHost(content: @Composable () -> Unit) {
         }
     }
     DisposableEffect(client) { onDispose { client.release() } }
-    CompositionLocalProvider(LocalProduct provides client, LocalAppNow provides clock) {
-        Column(Modifier.fillMaxSize()) {
-            TextButton(onClick = { address = client.endpoint; editServer = true }, modifier = Modifier.statusBarsPadding()) {
-                Text("演示用户名 · 未验证 · ${client.connection} · 后端设置", style = MaterialTheme.typography.labelSmall)
-            }
-            if (client.error.isNotBlank()) Text(client.error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 12.dp))
-            Box(Modifier.weight(1f)) { content() }
+    CompositionLocalProvider(LocalProduct provides client, LocalAppNow provides clock, LocalBackendSettings provides openBackend) {
+        Box(Modifier.fillMaxSize()) {
+            ProductContentFrame(client.user != null, client.connection, openBackend, content)
+            SnackbarHost(notifications, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 90.dp))
         }
     }
     if (editServer) AlertDialog(onDismissRequest = { editServer = false }, title = { Text("后端地址") },
@@ -287,4 +292,16 @@ internal fun ProductHost(content: @Composable () -> Unit) {
         text = { Text("将原本机心情和工作时段导入当前演示账号；已有云端心情不会被覆盖。") },
         confirmButton = { TextButton(onClick = { client.importLegacy(); importPrompt = false }) { Text("导入当前账号") } },
         dismissButton = { TextButton(onClick = { client.skipImport(); importPrompt = false }) { Text("暂不导入") } })
+}
+
+/** Logged-in pages get the same viewport as previews; connection setup stays available before login. */
+@Composable
+internal fun ProductContentFrame(loggedIn: Boolean, connection: String, onBackend: () -> Unit, content: @Composable () -> Unit) {
+    if (loggedIn) Box(Modifier.fillMaxSize().testTag("product_viewport")) { content() }
+    else Column(Modifier.fillMaxSize()) {
+        TextButton(onClick = onBackend, modifier = Modifier.statusBarsPadding().testTag("backend_setup")) {
+            Text("演示用户名 · 未验证 · $connection · 后端设置", style = MaterialTheme.typography.labelSmall)
+        }
+        Box(Modifier.weight(1f).consumeWindowInsets(WindowInsets.statusBars)) { content() }
+    }
 }

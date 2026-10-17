@@ -42,9 +42,10 @@ class FourTabNavigationTest {
         compose.onNodeWithTag("nav_diary").assertIsSelected()
         compose.onNodeWithTag("diary_chat_entry").performClick()
         compose.onNodeWithTag("chat_input").assertTextContains("还没写完")
-        compose.onNodeWithTag("nav_camera").performClick()
+        compose.onNodeWithTag("nav_home").performClick()
+        compose.onNodeWithContentDescription("陪伴视角").performClick()
         compose.onNodeWithTag("camera_screen").assertExists()
-        compose.onNodeWithTag("nav_camera").assertIsSelected()
+        compose.onNodeWithTag("nav_camera").assertDoesNotExist()
         compose.runOnIdle { back!!.onBackPressed() }
         compose.onNodeWithTag("morning_home").assertExists()
     }
@@ -71,23 +72,24 @@ class FourTabNavigationTest {
         compose.runOnIdle { assertEquals(listOf("test:fatigue", "test:diary"), acknowledgements) }
     }
 
-    @Test fun allFourTabsKeepTheirOwnDestinationAndSelectionAfterRestoration() {
+    @Test fun threeTabsKeepTheirDestinationsAndCameraRemainsReachableAfterRestoration() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { LookBuddyApp() }
-        val tabs = listOf("home", "camera", "diary", "settings")
+        val tabs = listOf("home", "diary", "settings")
         for (tab in tabs) compose.onNodeWithTag("nav_" + tab).assertIsDisplayed()
         compose.onNodeWithTag("nav_home").assertIsSelected()
-        compose.onNodeWithTag("nav_camera").performClick()
+        compose.onNodeWithTag("nav_camera").assertDoesNotExist()
+        compose.onNodeWithContentDescription("陪伴视角").performClick()
         compose.onNodeWithTag("camera_screen").assertExists()
-        compose.onNodeWithTag("nav_camera").assertIsSelected()
+        compose.onNodeWithTag("nav_camera").assertDoesNotExist()
         compose.onNodeWithTag("nav_home").assertIsNotSelected()
         restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithTag("camera_screen").assertExists()
-        compose.onNodeWithTag("nav_camera").assertIsSelected()
+        compose.onNodeWithTag("nav_camera").assertDoesNotExist()
         compose.onNodeWithTag("nav_diary").performClick()
         compose.onNodeWithTag("diary_screen").assertExists()
         compose.onNodeWithTag("nav_diary").assertIsSelected()
-        compose.onNodeWithTag("nav_camera").assertIsNotSelected()
+        compose.onNodeWithTag("nav_camera").assertDoesNotExist()
         compose.onNodeWithTag("nav_settings").performClick()
         compose.onNodeWithTag("settings_screen").assertExists()
         compose.onNodeWithTag("nav_settings").assertIsSelected()

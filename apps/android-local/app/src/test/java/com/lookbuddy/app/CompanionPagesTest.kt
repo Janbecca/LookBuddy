@@ -168,7 +168,7 @@ class CompanionPagesTest {
 
     @Test fun homeCameraOpensAndDisconnectedMarkNeverSaves() {
         compose.setContent { LookBuddyApp() }
-        compose.onNodeWithTag("nav_camera").performClick()
+        compose.onNodeWithContentDescription("陪伴视角").performClick()
         compose.onNodeWithTag("mark_moment").performScrollTo().performClick()
         compose.onNodeWithTag("camera_feedback").performScrollTo().assertTextEquals("请先连接摄像头，并等待视频缓冲就绪。")
         compose.onAllNodesWithText("待识别").assertCountEquals(2)
